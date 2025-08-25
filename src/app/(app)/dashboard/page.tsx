@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import { Package, Store, CircleDollarSign, AlertCircle } from 'lucide-react';
+import { Package, Store, CircleDollarSign, AlertCircle, TrendingUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { format, parseISO } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
@@ -57,6 +59,19 @@ export default function DashboardPage() {
     const formattedValue = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(value));
     return isNegative ? `(${formattedValue})` : formattedValue;
   };
+  
+  const formatCurrencyShort = (value: number) => {
+    if (value >= 1_000_000_000) {
+      return (value / 1_000_000_000).toFixed(1) + ' M';
+    }
+    if (value >= 1_000_000) {
+      return (value / 1_000_000).toFixed(1) + ' Jt';
+    }
+    if (value >= 1_000) {
+      return (value / 1_000).toFixed(1) + ' Rb';
+    }
+    return value.toString();
+  };
 
   const dashboardMetrics = useMemo(() => {
     if (!data) return {
@@ -65,7 +80,8 @@ export default function DashboardPage() {
       totalOutstanding: 0,
       totalAssetValue: 0,
       stockByProduct: [],
-      topOutstandingKiosks: []
+      topOutstandingKiosks: [],
+      monthlySales: [],
     };
 
     const { kiosks, products, redemptions, doReleases, distributions, payments } = data;
@@ -78,14 +94,16 @@ export default function DashboardPage() {
     products.forEach(p => { stock[p.id] = 0; });
     const redeemedQtyByProduct: Record<string, number> = {};
     redemptions.forEach(r => { redeemedQtyByProduct[r.productId] = (redeemedQtyByProduct[r.productId] || 0) + r.quantity; });
-    const releasedQtyByProduct: Record<string, number> = {};
+    
     const redemptionProductMap = redemptions.reduce((map, r) => { map[r.doNumber] = r.productId; return map; }, {} as Record<string, string>);
+    const releasedQtyByProduct: Record<string, number> = {};
     doReleases.forEach(release => {
       const productId = redemptionProductMap[release.doNumber];
       if (productId) {
         releasedQtyByProduct[productId] = (releasedQtyByProduct[productId] || 0) + release.quantity;
       }
     });
+
     products.forEach(p => {
       stock[p.id] = (redeemedQtyByProduct[p.id] || 0) - (releasedQtyByProduct[p.id] || 0);
     });
@@ -98,9 +116,11 @@ export default function DashboardPage() {
       fill: `hsl(var(--chart-1))`,
     })).sort((a,b) => b.stock - a.stock);
 
-    // Outstanding Bills
+    // Outstanding Bills & Sales
     const kioskBills: Record<string, number> = {};
     kiosks.forEach(k => { kioskBills[k.id] = 0; });
+    const salesByMonth: Record<string, number> = {};
+
     distributions.forEach(dist => {
       const redemption = redemptions.find(r => r.doNumber === dist.doNumber);
       const product = redemption ? products.find(p => p.id === redemption.productId) : undefined;
@@ -109,6 +129,10 @@ export default function DashboardPage() {
         const totalPaid = dist.directPayment + payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
         const outstanding = totalValue - totalPaid;
         kioskBills[dist.kioskId] = (kioskBills[dist.kioskId] || 0) + outstanding;
+
+        // Sales calculation
+        const monthKey = format(parseISO(dist.date), 'yyyy-MM');
+        salesByMonth[monthKey] = (salesByMonth[monthKey] || 0) + totalValue;
       }
     });
 
@@ -124,8 +148,16 @@ export default function DashboardPage() {
         .sort((a, b) => b.amount - a.amount)
         .slice(0, 5);
 
+    const monthlySales = Object.entries(salesByMonth)
+      .map(([monthKey, total]) => ({
+        name: format(parseISO(monthKey + '-01'), 'MMM yy', { locale: id }),
+        total: total,
+        fill: `hsl(var(--chart-2))`,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
-    return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks };
+
+    return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks, monthlySales };
   }, [data]);
   
   if (loading) {
@@ -135,9 +167,10 @@ export default function DashboardPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32" />)}
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <Skeleton className="h-80" />
               <Skeleton className="h-80" />
+              <Skeleton className="h-80 lg:col-span-1" />
           </div>
       </div>
     );
@@ -190,29 +223,29 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Stok Produk di Gudang</CardTitle>
-            <CardDescription>Jumlah stok tersedia untuk setiap produk (dalam Ton).</CardDescription>
+            <CardTitle>Penjualan Bulanan</CardTitle>
+            <CardDescription>Total nilai penjualan dari penyaluran kios per bulan.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={{}} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboardMetrics.stockByProduct} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-25} textAnchor="end" height={60} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip 
-                        cursor={{fill: 'hsl(var(--muted))'}}
-                        content={<ChartTooltipContent indicator="dot" />}
-                      />
-                      <Bar dataKey="stock" radius={[4, 4, 0, 0]}>
-                         <LabelList dataKey="stock" position="top" offset={8} className="fill-foreground text-xs" formatter={(value: number) => value.toLocaleString('id-ID')} />
-                      </Bar>
-                  </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+             <ChartContainer config={{}} className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboardMetrics.monthlySales} margin={{ top: 20, right: 20, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => formatCurrencyShort(value as number)} />
+                        <Tooltip 
+                          cursor={{fill: 'hsl(var(--muted))'}}
+                          content={<ChartTooltipContent indicator="dot" formatter={(value) => formatCurrency(value as number)} />}
+                        />
+                        <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                           <LabelList dataKey="total" position="top" offset={8} className="fill-foreground text-xs" formatter={(value: number) => formatCurrencyShort(value)} />
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
           </CardContent>
         </Card>
         <Card>
@@ -246,6 +279,33 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+       <Card>
+          <CardHeader>
+            <CardTitle>Stok Produk di Gudang</CardTitle>
+            <CardDescription>Jumlah stok tersedia untuk setiap produk (dalam Ton).</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={{}} className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dashboardMetrics.stockByProduct} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-25} textAnchor="end" height={60} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        cursor={{fill: 'hsl(var(--muted))'}}
+                        content={<ChartTooltipContent indicator="dot" />}
+                      />
+                      <Bar dataKey="stock" radius={[4, 4, 0, 0]}>
+                         <LabelList dataKey="stock" position="top" offset={8} className="fill-foreground text-xs" formatter={(value: number) => value.toLocaleString('id-ID')} />
+                      </Bar>
+                  </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
     </div>
   );
 }
+
+    
