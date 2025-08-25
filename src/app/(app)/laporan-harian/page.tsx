@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -22,7 +23,7 @@ import { generateDailySummary } from '@/ai/flows/summary-flow';
 
 
 export default function LaporanHarianPage() {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [summary, setSummary] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +35,9 @@ export default function LaporanHarianPage() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Set the initial date on the client to avoid hydration mismatch
+    setSelectedDate(new Date());
+
     async function loadData() {
       try {
         setRedemptions(await getRedemptions());
@@ -150,7 +154,7 @@ export default function LaporanHarianPage() {
                 className="rounded-md border"
                 locale={id}
               />
-              <Button onClick={handleGenerateSummary} disabled={isLoading} className="w-full">
+              <Button onClick={handleGenerateSummary} disabled={isLoading || !selectedDate} className="w-full">
                 {isLoading ? 'AI Sedang Berpikir...' : 'Minta Ringkasan dari AI'}
               </Button>
           </div>
