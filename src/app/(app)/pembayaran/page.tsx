@@ -166,6 +166,31 @@ export default function PembayaranPage() {
       toast({ title: 'Error', description: 'Gagal menyimpan pembayaran.', variant: 'destructive' });
     }
   };
+  
+  const handleLunas = () => {
+    const doNumber = form.getValues('doNumber');
+    const kioskId = form.getValues('kioskId');
+
+    if (!doNumber || !kioskId) return;
+
+    const relevantDistribution = distributions.find(d => d.doNumber === doNumber && d.kioskId === kioskId);
+    if (!relevantDistribution) return;
+
+    const redemption = redemptions.find(r => r.doNumber === doNumber);
+    const product = redemption ? products.find(p => p.id === redemption.productId) : undefined;
+    if (!product) return;
+
+    const totalValue = relevantDistribution.quantity * product.sellPrice;
+    const totalPaidViaTempo = payments
+        .filter(p => p.doNumber === doNumber && p.kioskId === kioskId && p.id !== editingPayment?.id)
+        .reduce((sum, p) => sum + p.amount, 0);
+
+    const outstandingBalance = totalValue - relevantDistribution.directPayment - totalPaidViaTempo;
+    
+    if (outstandingBalance > 0) {
+      form.setValue('amount', outstandingBalance);
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -278,7 +303,16 @@ export default function PembayaranPage() {
               />
 
               <FormField name="amount" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Total Bayar</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <div className="flex justify-between items-center">
+                    <FormLabel>Total Bayar</FormLabel>
+                    <Button type="button" size="sm" variant="secondary" onClick={handleLunas}>
+                      LUNAS
+                    </Button>
+                  </div>
+                  <FormControl><Input type="number" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Batal</Button></DialogClose>
