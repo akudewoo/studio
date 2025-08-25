@@ -28,7 +28,6 @@ import {
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +36,8 @@ import { getDOReleases, addDORelease, updateDORelease, deleteDORelease, deleteMu
 import { getRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
+import { Combobox } from '@/components/ui/combobox';
+
 
 const doReleaseSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
@@ -98,6 +99,13 @@ export default function PengeluaranDOPage() {
       return map;
     }, {} as Record<string, Product>);
   }, [products]);
+
+  const doOptions = useMemo(() => {
+    return redemptions.map(r => ({
+      value: r.doNumber,
+      label: `${r.doNumber} (${productMap[r.productId]?.name || 'N/A'})`,
+    }));
+  }, [redemptions, productMap]);
 
   const handleDialogOpen = (release: DORelease | null) => {
     setEditingRelease(release);
@@ -410,14 +418,17 @@ export default function PengeluaranDOPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
               <FormField name="doNumber" control={form.control} render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>NO DO</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!editingRelease}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Pilih NO DO dari penebusan" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {redemptions.map(r => <SelectItem key={r.doNumber} value={r.doNumber}>{r.doNumber} ({productMap[r.productId]?.name})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                   <Combobox
+                      options={doOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Pilih NO DO"
+                      searchPlaceholder="Cari NO DO..."
+                      emptyPlaceholder="NO DO tidak ditemukan."
+                      disabled={!!editingRelease}
+                    />
                   <FormMessage />
                 </FormItem>
               )} />

@@ -40,6 +40,7 @@ import { getRedemptions } from '@/services/redemptionService';
 import { getPayments } from '@/services/paymentService';
 import { getDOReleases } from '@/services/doReleaseService';
 import { cn } from '@/lib/utils';
+import { Combobox } from '@/components/ui/combobox';
 
 const distributionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
@@ -93,6 +94,20 @@ export default function PenyaluranKiosPage() {
     const doRelease = doReleases.find(d => d.doNumber === doNumber);
     return { redemption, product, doRelease };
   }
+
+  const productMap = useMemo(() => {
+    return products.reduce((map, p) => {
+      map[p.id] = p;
+      return map;
+    }, {} as Record<string, Product>);
+  }, [products]);
+  
+  const doOptions = useMemo(() => {
+    return redemptions.map(r => ({
+      value: r.doNumber,
+      label: `${r.doNumber} (${productMap[r.productId]?.name || 'N/A'})`,
+    }));
+  }, [redemptions, productMap]);
   
   const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
   
@@ -374,11 +389,19 @@ export default function PenyaluranKiosPage() {
           <DialogHeader><DialogTitle className="font-headline">{editingDist ? 'Ubah' : 'Tambah'} Penyaluran</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-              <FormField name="doNumber" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>NO DO</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Pilih NO DO" /></SelectTrigger></FormControl>
-                  <SelectContent>{redemptions.map(r => <SelectItem key={r.doNumber} value={r.doNumber}>{r.doNumber} ({getDetails(r.doNumber).product?.name})</SelectItem>)}</SelectContent>
-                </Select><FormMessage /></FormItem>
+               <FormField name="doNumber" control={form.control} render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>NO DO</FormLabel>
+                   <Combobox
+                      options={doOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Pilih NO DO"
+                      searchPlaceholder="Cari NO DO..."
+                      emptyPlaceholder="NO DO tidak ditemukan."
+                    />
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField
                 control={form.control}
