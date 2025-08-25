@@ -57,7 +57,7 @@ const AppSidebar = () => {
                     <Link href="/produk">
                         <Logo className="size-6 shrink-0 text-primary" />
                         <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                            AlurDistribusi
+                            TANI MAKMUR MAGETAN
                         </span>
                     </Link>
                 </Button>
@@ -103,7 +103,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               >
                   <Logo className="size-6 shrink-0 text-primary" />
                   <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                      AlurDistribusi
+                      TANI MAKMUR MAGETAN
                   </span>
               </Button>
           </SidebarHeader>
@@ -124,7 +124,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarInset>
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
               <SidebarTrigger />
-              <h1 className="font-headline text-lg font-semibold">AlurDistribusi</h1>
+              <h1 className="font-headline text-lg font-semibold">TANI MAKMUR MAGETAN</h1>
            </header>
            {children}
         </SidebarInset>
@@ -138,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
           <SidebarTrigger />
-          <h1 className="font-headline text-lg font-semibold">AlurDistribusi</h1>
+          <h1 className="font-headline text-lg font-semibold">TANI MAKMUR MAGETAN</h1>
         </header>
         {children}
       </SidebarInset>

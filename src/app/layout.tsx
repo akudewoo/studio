@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'Alur Distribusi',
-  description: 'Aplikasi untuk mengelola alur distribusi barang.',
+  title: 'TANI MAKMUR MAGETAN',
+  description: 'Aplikasi untuk mengelola alur distribusi TANI MAKMUR MAGETAN.',
 };
 
 export default function RootLayout({
