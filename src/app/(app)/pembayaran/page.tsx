@@ -39,6 +39,8 @@ import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
 import { cn } from '@/lib/utils';
+import { Combobox } from '@/components/ui/combobox';
+
 
 const paymentSchema = z.object({
   date: z.date({ required_error: 'Tanggal harus diisi' }),
@@ -206,13 +208,31 @@ export default function PembayaranPage() {
     const seen = new Set<string>();
     return distributions.filter(d => {
         const key = `${d.doNumber}-${d.kioskId}`;
-        if(seen.has(key)) {
+        const redemption = redemptions.find(r => r.doNumber === d.doNumber);
+        const product = redemption ? products.find(p => p.id === redemption.productId) : undefined;
+        if (!product) return false;
+        
+        const totalValue = d.quantity * product.sellPrice;
+        const totalPaid = payments
+            .filter(p => p.doNumber === d.doNumber && p.kioskId === d.kioskId)
+            .reduce((sum, p) => sum + p.amount, 0);
+        
+        const outstanding = totalValue - d.directPayment - totalPaid;
+
+        if(seen.has(key) || outstanding <= 0) {
             return false;
         }
         seen.add(key);
         return true;
     });
-  }, [distributions]);
+  }, [distributions, payments, redemptions, products]);
+  
+  const distributionOptions = useMemo(() => {
+    return uniqueDistributions.map(d => ({
+        value: `${d.doNumber}|${d.kioskId}`,
+        label: `${d.doNumber} - ${getKioskName(d.kioskId)}`
+    }));
+  }, [uniqueDistributions, kiosks]);
 
 
   const handleDialogOpen = (payment: Payment | null) => {
@@ -566,16 +586,30 @@ export default function PembayaranPage() {
                   </FormItem>
                 )}
               />
-              <FormField name="doNumber" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Transaksi (NO DO - Kios)</FormLabel><Select onValueChange={(value) => {
-                    const [doNum, kioskId] = value.split('|');
-                    form.setValue('doNumber', doNum);
-                    form.setValue('kioskId', kioskId);
-                }} defaultValue={editingPayment ? `${editingPayment.doNumber}|${editingPayment.kioskId}` : ''}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Pilih transaksi" /></SelectTrigger></FormControl>
-                  <SelectContent>{uniqueDistributions.map(d => <SelectItem key={`${d.doNumber}-${d.kioskId}`} value={`${d.doNumber}|${d.kioskId}`}>{d.doNumber} - {getKioskName(d.kioskId)}</SelectItem>)}</SelectContent>
-                </Select><FormMessage /></FormItem>
-              )} />
+              <FormField
+                control={form.control}
+                name="doNumber"
+                render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                        <FormLabel>Transaksi (NO DO - Kios)</FormLabel>
+                        <Combobox
+                            options={distributionOptions}
+                            value={`${form.getValues('doNumber')}|${form.getValues('kioskId')}`}
+                            onChange={(value) => {
+                                const [doNum, kioskId] = value.split('|');
+                                form.setValue('doNumber', doNum);
+                                form.setValue('kioskId', kioskId);
+                            }}
+                            placeholder="Pilih transaksi"
+                            searchPlaceholder="Cari transaksi..."
+                            emptyPlaceholder="Transaksi tidak ditemukan."
+                            disabled={!!editingPayment}
+                        />
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
                <FormField name="kioskId" control={form.control} render={({ field }) => (<FormItem className="hidden"><Input {...field} /></FormItem>)} />
               
               <OutstandingBalanceDisplay 
