@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
@@ -31,10 +31,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import type { Payment, Kiosk, KioskDistribution } from '@/lib/types';
+import type { Payment, Kiosk, KioskDistribution, Product, Redemption } from '@/lib/types';
 import { getPayments, addPayment, updatePayment, deletePayment } from '@/services/paymentService';
 import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
+import { getProducts } from '@/services/productService';
+import { getRedemptions } from '@/services/redemptionService';
 import { cn } from '@/lib/utils';
 
 const paymentSchema = z.object({
@@ -44,10 +46,47 @@ const paymentSchema = z.object({
   amount: z.coerce.number().min(1, { message: 'Jumlah bayar harus lebih dari 0' }),
 });
 
+function OutstandingBalanceDisplay({ control, distributions, redemptions, products, payments, editingPayment }: { control: any, distributions: KioskDistribution[], redemptions: Redemption[], products: Product[], payments: Payment[], editingPayment: Payment | null }) {
+    const doNumber = useWatch({ control, name: 'doNumber' });
+    const kioskId = useWatch({ control, name: 'kioskId' });
+    const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+
+    const outstandingBalance = useMemo(() => {
+        if (!doNumber || !kioskId) return 0;
+
+        const relevantDistribution = distributions.find(d => d.doNumber === doNumber && d.kioskId === kioskId);
+        if (!relevantDistribution) return 0;
+        
+        const redemption = redemptions.find(r => r.doNumber === doNumber);
+        const product = redemption ? products.find(p => p.id === redemption.productId) : undefined;
+        if (!product) return 0;
+
+        const totalValue = relevantDistribution.quantity * product.sellPrice;
+        const totalPaidViaTempo = payments
+            .filter(p => p.doNumber === doNumber && p.kioskId === kioskId && p.id !== editingPayment?.id)
+            .reduce((sum, p) => sum + p.amount, 0);
+
+        return totalValue - relevantDistribution.directPayment - totalPaidViaTempo;
+    }, [doNumber, kioskId, distributions, redemptions, products, payments, editingPayment]);
+
+    if (outstandingBalance <= 0) return null;
+
+    return (
+        <FormItem>
+            <FormLabel>Sisa Tagihan</FormLabel>
+            <FormControl>
+                <Input type="text" readOnly value={formatCurrency(outstandingBalance)} className="font-semibold" />
+            </FormControl>
+        </FormItem>
+    );
+}
+
 export default function PembayaranPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const { toast } = useToast();
@@ -58,6 +97,8 @@ export default function PembayaranPage() {
         setPayments(await getPayments());
         setDistributions(await getKioskDistributions());
         setKiosks(await getKiosks());
+        setProducts(await getProducts());
+        setRedemptions(await getRedemptions());
       } catch (error) {
         toast({
           title: 'Gagal memuat data',
@@ -220,12 +261,22 @@ export default function PembayaranPage() {
                     const [doNum, kioskId] = value.split('|');
                     form.setValue('doNumber', doNum);
                     form.setValue('kioskId', kioskId);
-                }} defaultValue={`${field.value}|${form.getValues('kioskId')}`}>
+                }} defaultValue={editingPayment ? `${editingPayment.doNumber}|${editingPayment.kioskId}` : ''}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Pilih transaksi" /></SelectTrigger></FormControl>
                   <SelectContent>{uniqueDistributions.map(d => <SelectItem key={`${d.doNumber}-${d.kioskId}`} value={`${d.doNumber}|${d.kioskId}`}>{d.doNumber} - {getKioskName(d.kioskId)}</SelectItem>)}</SelectContent>
                 </Select><FormMessage /></FormItem>
               )} />
                <FormField name="kioskId" control={form.control} render={({ field }) => (<FormItem className="hidden"><Input {...field} /></FormItem>)} />
+              
+              <OutstandingBalanceDisplay 
+                control={form.control}
+                distributions={distributions}
+                redemptions={redemptions}
+                products={products}
+                payments={payments}
+                editingPayment={editingPayment}
+              />
+
               <FormField name="amount" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>Total Bayar</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
