@@ -8,7 +8,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit/zod';
+import { z } from 'zod';
 
 export const DailySummaryInputSchema = z.object({
   date: z.string().describe('The date for the summary in "d MMMM yyyy" format.'),
@@ -26,13 +26,13 @@ export async function generateDailySummary(input: DailySummaryInput): Promise<st
   const summaryFlow = ai.defineFlow(
     {
       name: 'summaryFlow',
-      inputSchema: DailySummary_InputSchema,
+      inputSchema: DailySummaryInputSchema,
       outputSchema: z.string(),
     },
     async (data) => {
       const prompt = ai.definePrompt({
         name: 'summaryPrompt',
-        input: { schema: DailySummary_InputSchema },
+        input: { schema: DailySummaryInputSchema },
         output: { format: 'text' },
         prompt: `
           Anda adalah asisten AI yang bertugas membuat laporan harian untuk bisnis distribusi pupuk.
