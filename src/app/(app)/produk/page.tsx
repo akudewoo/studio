@@ -147,8 +147,7 @@ export default function ProdukPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof productSchema>) => {
-    setIsDialogOpen(false);
-
+    
     if (editingProduct) {
       const originalProducts = [...products];
       const updatedProduct = { ...editingProduct, ...values };
@@ -191,6 +190,7 @@ export default function ProdukPage() {
         });
       }
     }
+    setIsDialogOpen(false);
   };
   
   const formatCurrency = (value: number) => {
