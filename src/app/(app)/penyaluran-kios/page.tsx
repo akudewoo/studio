@@ -200,7 +200,7 @@ export default function PenyaluranKiosPage() {
               <FormField name="doNumber" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>NO DO</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Pilih NO DO" /></SelectTrigger></FormControl>
-                  <SelectContent>{doReleases.map(r => <SelectItem key={r.doNumber} value={r.doNumber}>{r.doNumber} ({getDetails(r.doNumber).product?.name})</SelectItem>)}</SelectContent>
+                  <SelectContent>{redemptions.map(r => <SelectItem key={r.doNumber} value={r.doNumber}>{r.doNumber} ({getDetails(r.doNumber).product?.name})</SelectItem>)}</SelectContent>
                 </Select><FormMessage /></FormItem>
               )} />
               <FormField
