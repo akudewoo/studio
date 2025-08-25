@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -27,8 +27,8 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import type { Product } from '@/lib/types';
-import { initialProducts } from '@/lib/data';
+import type { Product, Redemption, DORelease } from '@/lib/types';
+import { initialProducts, initialRedemptions, initialDOReleases } from '@/lib/data';
 
 const productSchema = z.object({
   name: z.string().min(1, { message: 'Nama produk harus diisi' }),
@@ -38,6 +38,8 @@ const productSchema = z.object({
 
 export default function ProdukPage() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [redemptions] = useState<Redemption[]>(initialRedemptions);
+  const [doReleases] = useState<DORelease[]>(initialDOReleases);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const { toast } = useToast();
@@ -50,6 +52,43 @@ export default function ProdukPage() {
       sellPrice: 0,
     },
   });
+  
+  const stockByProduct = useMemo(() => {
+    const stock: Record<string, number> = {};
+
+    // Calculate total redeemed per DO
+    const redeemedQtyByDO: Record<string, number> = {};
+    redemptions.forEach(redemption => {
+      if (!redeemedQtyByDO[redemption.doNumber]) {
+        redeemedQtyByDO[redemption.doNumber] = 0;
+      }
+      redeemedQtyByDO[redemption.doNumber] += redemption.quantity;
+    });
+    
+    // Calculate total released per DO
+    const releasedQtyByDO: Record<string, number> = {};
+    doReleases.forEach(release => {
+      if (!releasedQtyByDO[release.doNumber]) {
+        releasedQtyByDO[release.doNumber] = 0;
+      }
+      releasedQtyByDO[release.doNumber] += release.quantity;
+    });
+
+    // Calculate stock per product
+    products.forEach(p => {
+        stock[p.id] = 0;
+    });
+
+    redemptions.forEach(redemption => {
+        const totalRedeemed = redemption.quantity;
+        const totalReleased = releasedQtyByDO[redemption.doNumber] || 0;
+        const remainingStock = totalRedeemed - totalReleased;
+        stock[redemption.productId] = (stock[redemption.productId] || 0) + remainingStock;
+    });
+    
+    return stock;
+  }, [products, redemptions, doReleases]);
+
 
   const handleDialogOpen = (product: Product | null) => {
     setEditingProduct(product);
@@ -124,6 +163,7 @@ export default function ProdukPage() {
                 <TableHead>Nama Produk</TableHead>
                 <TableHead className="text-right">Harga Beli</TableHead>
                 <TableHead className="text-right">Harga Jual</TableHead>
+                <TableHead className="text-right">Stok</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -136,6 +176,9 @@ export default function ProdukPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     {formatCurrency(product.sellPrice)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {(stockByProduct[product.id] || 0).toLocaleString('id-ID')}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
