@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 
@@ -42,6 +42,11 @@ const productSchema = z.object({
   sellPrice: z.coerce.number().min(0, { message: 'Harga jual harus positif' }),
 });
 
+type SortConfig = {
+  key: keyof Product | 'stock';
+  direction: 'ascending' | 'descending';
+} | null;
+
 export default function ProdukPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -50,6 +55,7 @@ export default function ProdukPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,23 +77,6 @@ export default function ProdukPage() {
     loadData();
   }, [toast]);
   
-  const filteredProducts = useMemo(() => {
-    if (!searchQuery) return products;
-    return products.filter(product =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [products, searchQuery]);
-
-
-  const form = useForm<z.infer<typeof productSchema>>({
-    resolver: zodResolver(productSchema),
-    defaultValues: {
-      name: '',
-      purchasePrice: 0,
-      sellPrice: 0,
-    },
-  });
-
   const stockByProduct = useMemo(() => {
     const stock: Record<string, number> = {};
     products.forEach(p => {
@@ -120,7 +109,59 @@ export default function ProdukPage() {
     
     return stock;
 }, [products, redemptions, doReleases]);
+  
+  const sortedAndFilteredProducts = useMemo(() => {
+    let sortableProducts = [...products];
 
+    if (searchQuery) {
+        sortableProducts = sortableProducts.filter(product =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    if (sortConfig !== null) {
+      sortableProducts.sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+
+        if (sortConfig.key === 'stock') {
+          aValue = stockByProduct[a.id] || 0;
+          bValue = stockByProduct[b.id] || 0;
+        } else {
+          aValue = a[sortConfig.key as keyof Product];
+          bValue = b[sortConfig.key as keyof Product];
+        }
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return sortableProducts;
+  }, [products, searchQuery, sortConfig, stockByProduct]);
+
+  const requestSort = (key: keyof Product | 'stock') => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+
+  const form = useForm<z.infer<typeof productSchema>>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: '',
+      purchasePrice: 0,
+      sellPrice: 0,
+    },
+  });
 
   const handleDialogOpen = (product: Product | null) => {
     setEditingProduct(product);
@@ -208,7 +249,7 @@ export default function ProdukPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedProducts(filteredProducts.map(p => p.id));
+      setSelectedProducts(sortedAndFilteredProducts.map(p => p.id));
     } else {
       setSelectedProducts([]);
     }
@@ -246,7 +287,7 @@ export default function ProdukPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = filteredProducts.map(p => ({
+    const dataToExport = sortedAndFilteredProducts.map(p => ({
         'Nama Produk': p.name,
         'Harga Beli': p.purchasePrice,
         'Harga Jual': p.sellPrice,
@@ -375,20 +416,40 @@ export default function ProdukPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={filteredProducts.length > 0 && selectedProducts.length === filteredProducts.length}
+                    checked={sortedAndFilteredProducts.length > 0 && selectedProducts.length === sortedAndFilteredProducts.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>Nama Produk</TableHead>
-                <TableHead className="text-right">Harga Beli</TableHead>
-                <TableHead className="text-right">Harga Jual</TableHead>
-                <TableHead className="text-right">Stok</TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => requestSort('name')}>
+                    Nama Produk
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button variant="ghost" onClick={() => requestSort('purchasePrice')}>
+                    Harga Beli
+                     <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button variant="ghost" onClick={() => requestSort('sellPrice')}>
+                    Harga Jual
+                     <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button variant="ghost" onClick={() => requestSort('stock')}>
+                    Stok
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts.map((product) => (
+              {sortedAndFilteredProducts.map((product) => (
                 <TableRow key={product.id} data-state={selectedProducts.includes(product.id) && "selected"}>
                   <TableCell>
                     <Checkbox
