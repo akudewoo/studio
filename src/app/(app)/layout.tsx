@@ -74,7 +74,7 @@ const AppSidebar = () => {
             </SidebarHeader>
             <SidebarContent>
                 <SidebarMenu>
-                {[...Array(7)].map((_, i) => (
+                {[...Array(6)].map((_, i) => (
                     <SidebarMenuItem key={i}>
                         <SidebarMenuButton>
                             <div className="size-4 bg-muted rounded-md animate-pulse" />
@@ -82,6 +82,16 @@ const AppSidebar = () => {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 ))}
+                </SidebarMenu>
+            </SidebarContent>
+            <SidebarContent className="!flex-grow-0">
+                 <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton>
+                           <div className="size-4 bg-muted rounded-md animate-pulse" />
+                           <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarContent>
         </Sidebar>
