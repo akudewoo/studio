@@ -19,6 +19,7 @@ import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import type { Redemption, DORelease, KioskDistribution, Kiosk, Product } from '@/lib/types';
 import { MessageCircle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function LaporanHarianPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -31,9 +32,11 @@ export default function LaporanHarianPage() {
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const { toast } = useToast();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     // Set the initial date on the client to avoid hydration mismatch
+    setMounted(true);
     setSelectedDate(new Date());
 
     async function loadData() {
@@ -156,14 +159,19 @@ export default function LaporanHarianPage() {
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col items-center gap-4">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
-                locale={id}
-              />
-              <Button onClick={handleGenerateSummary} disabled={isLoading || !selectedDate} className="w-full">
+              {mounted ? (
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  className="rounded-md border"
+                  locale={id}
+                  disabled={(date) => date > new Date()}
+                />
+              ) : (
+                <Skeleton className="h-[298px] w-[320px] rounded-md border" />
+              )}
+              <Button onClick={handleGenerateSummary} disabled={isLoading || !selectedDate || !mounted} className="w-full">
                 {isLoading ? 'Membuat Ringkasan...' : 'Buat Ringkasan'}
               </Button>
           </div>
