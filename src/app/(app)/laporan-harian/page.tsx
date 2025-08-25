@@ -79,9 +79,22 @@ export default function LaporanHarianPage() {
         const dailyDoReleases = doReleases.filter(dr => isSameDay(new Date(dr.date), selectedDate));
         const dailyDistributions = distributions.filter(d => isSameDay(new Date(d.date), selectedDate));
         
-        const redemptionQty = dailyRedemptions.reduce((sum, r) => sum + r.quantity, 0);
-        const doReleaseQty = dailyDoReleases.reduce((sum, dr) => sum + dr.quantity, 0);
+        // Penebusan per produk
+        const redemptionByProduct: Record<string, number> = {};
+        dailyRedemptions.forEach(r => {
+            const productName = productMap[r.productId] || 'Produk tidak diketahui';
+            redemptionByProduct[productName] = (redemptionByProduct[productName] || 0) + r.quantity;
+        });
 
+        // Pengeluaran DO per produk
+        const doReleaseByProduct: Record<string, number> = {};
+        dailyDoReleases.forEach(dr => {
+            const productId = redemptionProductMap[dr.doNumber];
+            const productName = productId ? productMap[productId] : 'Produk tidak diketahui';
+            doReleaseByProduct[productName] = (doReleaseByProduct[productName] || 0) + dr.quantity;
+        });
+
+        // Penyaluran per kios
         const distByKiosk: Record<string, { product: string, quantity: number }[]> = {};
         dailyDistributions.forEach(dist => {
           const kioskName = kioskMap[dist.kioskId] || 'Kios tidak diketahui';
@@ -97,9 +110,27 @@ export default function LaporanHarianPage() {
         // Manual summary generation
         const formattedDate = format(selectedDate, 'd MMMM yyyy', { locale: id });
         let manualSummary = `*Laporan Harian - ${formattedDate}*\n\n`;
-        manualSummary += `📈 *Aktivitas Utama:*\n`;
-        manualSummary += `- Total Penebusan: *${redemptionQty.toLocaleString('id-ID')} Kg*\n`;
-        manualSummary += `- Total Pengeluaran DO: *${doReleaseQty.toLocaleString('id-ID')} Kg*\n\n`;
+        manualSummary += `📈 *Aktivitas Utama:*\n\n`;
+
+        manualSummary += `*Penebusan per Produk:*\n`;
+        if (Object.keys(redemptionByProduct).length > 0) {
+            for(const productName in redemptionByProduct) {
+                manualSummary += `- ${productName}: *${redemptionByProduct[productName].toLocaleString('id-ID')} Kg*\n`;
+            }
+        } else {
+            manualSummary += `- Tidak ada data penebusan hari ini.\n`;
+        }
+        manualSummary += `\n`;
+
+        manualSummary += `*Pengeluaran DO per Produk:*\n`;
+        if (Object.keys(doReleaseByProduct).length > 0) {
+            for(const productName in doReleaseByProduct) {
+                manualSummary += `- ${productName}: *${doReleaseByProduct[productName].toLocaleString('id-ID')} Kg*\n`;
+            }
+        } else {
+            manualSummary += `- Tidak ada data pengeluaran DO hari ini.\n`;
+        }
+        manualSummary += `\n`;
         
         manualSummary += `🚚 *Penyaluran Kios:*\n`;
         if (Object.keys(distByKiosk).length > 0) {
