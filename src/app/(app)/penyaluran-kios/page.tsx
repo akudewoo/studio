@@ -177,8 +177,9 @@ export default function PenyaluranKiosPage() {
     setSortConfig({ key, direction });
   };
   
-  const groupingOptions: {key: 'kioskId', label: string}[] = [
+  const groupingOptions: {key: keyof KioskDistribution, label: string}[] = [
     { key: 'kioskId', label: 'Nama Kios' },
+    { key: 'doNumber', label: 'NO DO'}
   ];
 
   const uniqueGroupValues = useMemo(() => {
@@ -189,7 +190,10 @@ export default function PenyaluranKiosPage() {
         label: getKioskName(kioskId)
       }));
     }
-    return [];
+    return [...new Set(distributions.map(d => d[groupFilter.key as keyof KioskDistribution]))].map(val => ({
+        value: val,
+        label: val
+    }));
   }, [distributions, groupFilter.key, kiosks]);
 
   const form = useForm<z.infer<typeof distributionSchema>>({
@@ -415,7 +419,7 @@ export default function PenyaluranKiosPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-             <Select onValueChange={(key) => setGroupFilter({ key: key as 'kioskId' | 'none', value: 'all' })} value={groupFilter.key}>
+             <Select onValueChange={(key) => setGroupFilter({ key: key as keyof KioskDistribution, value: 'all' })} value={groupFilter.key}>
                 <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Kelompokkan Data" />
                 </SelectTrigger>
@@ -495,7 +499,11 @@ export default function PenyaluranKiosPage() {
                 const kurangBayar = total - dist.directPayment - totalTempo;
 
                 return (
-                  <TableRow key={dist.id} data-state={selectedDists.includes(dist.id) && "selected"}>
+                  <TableRow 
+                    key={dist.id} 
+                    data-state={selectedDists.includes(dist.id) && "selected"}
+                    className={cn({ 'bg-destructive/10 hover:bg-destructive/20 data-[state=selected]:bg-destructive/20': kurangBayar > 0 })}
+                  >
                     <TableCell>
                       <Checkbox
                         checked={selectedDists.includes(dist.id)}
@@ -511,7 +519,7 @@ export default function PenyaluranKiosPage() {
                     <TableCell className="text-right">{formatCurrency(total)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dist.directPayment)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalTempo)}</TableCell>
-                    <TableCell className={cn("text-right", { "text-destructive": kurangBayar > 0 })}>{formatCurrency(kurangBayar)}</TableCell>
+                    <TableCell className={cn("text-right", { "text-destructive font-semibold": kurangBayar > 0 })}>{formatCurrency(kurangBayar)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
