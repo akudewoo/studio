@@ -4,9 +4,11 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +43,7 @@ import { getPayments } from '@/services/paymentService';
 import { getDOReleases } from '@/services/doReleaseService';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
+import { exportToPdf } from '@/lib/pdf-export';
 
 const distributionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
@@ -318,7 +321,7 @@ export default function PenyaluranKiosPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredDistributions.map(dist => {
         const { product } = getDetails(dist.doNumber);
         const total = product ? dist.quantity * product.sellPrice : 0;
@@ -344,9 +347,37 @@ export default function PenyaluranKiosPage() {
     XLSX.writeFile(workbook, "DataPenyaluranKios.xlsx");
      toast({
         title: 'Sukses',
-        description: 'Data penyaluran kios berhasil diekspor.',
+        description: 'Data penyaluran kios berhasil diekspor ke Excel.',
       });
   };
+
+  const handleExportPdf = () => {
+    const headers = [['NO DO', 'Tanggal', 'Nama Produk', 'Nama Kios', 'QTY', 'Total', 'Dibayar Langsung', 'Pembayaran Tempo', 'Kurang Bayar', 'Keterangan']];
+    const data = sortedAndFilteredDistributions.map(dist => {
+        const { product } = getDetails(dist.doNumber);
+        const total = product ? dist.quantity * product.sellPrice : 0;
+        const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
+        const kurangBayar = total - dist.directPayment - totalTempo;
+        const keterangan = kurangBayar <= 0 ? "Lunas" : "Belum Lunas";
+        return [
+            dist.doNumber,
+            format(new Date(dist.date), 'dd/MM/yyyy'),
+            product?.name || 'N/A',
+            getKioskName(dist.kioskId),
+            dist.quantity.toLocaleString('id-ID'),
+            formatCurrency(total),
+            formatCurrency(dist.directPayment),
+            formatCurrency(totalTempo),
+            formatCurrency(kurangBayar),
+            keterangan
+        ];
+    });
+    exportToPdf('Data Penyaluran Kios', headers, data);
+    toast({
+      title: 'Sukses',
+      description: 'Data penyaluran kios berhasil diekspor ke PDF.',
+    });
+  }
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -469,10 +500,18 @@ export default function PenyaluranKiosPage() {
                 <Upload className="mr-2 h-4 w-4" />
                 Impor
             </Button>
-            <Button size="sm" variant="outline" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Ekspor
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Ekspor <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                  <DropdownMenuItem onClick={handleExportPdf}>Ekspor ke PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel}>Ekspor ke Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           {selectedDists.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

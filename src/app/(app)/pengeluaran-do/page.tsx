@@ -4,9 +4,11 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +39,7 @@ import { getRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
+import { exportToPdf } from '@/lib/pdf-export';
 
 
 const doReleaseSchema = z.object({
@@ -291,7 +294,7 @@ export default function PengeluaranDOPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredDoReleases.map(r => {
         const redemption = redemptionMap[r.doNumber];
         const product = redemption ? productMap[redemption.productId] : null;
@@ -311,8 +314,30 @@ export default function PengeluaranDOPage() {
     XLSX.writeFile(workbook, "DataPengeluaranDO.xlsx");
      toast({
         title: 'Sukses',
-        description: 'Data pengeluaran DO berhasil diekspor.',
+        description: 'Data pengeluaran DO berhasil diekspor ke Excel.',
       });
+  };
+
+  const handleExportPdf = () => {
+    const headers = [['NO DO', 'Tanggal', 'Nama Produk', 'QTY DO', 'QTY Penebusan', 'Sisa Penebusan']];
+    const data = sortedAndFilteredDoReleases.map(r => {
+      const redemption = redemptionMap[r.doNumber];
+      const product = redemption ? productMap[redemption.productId] : null;
+      const sisa = sisaPenebusanByDO[r.doNumber] ?? 0;
+      return [
+        r.doNumber,
+        format(new Date(r.date), 'dd/MM/yyyy'),
+        product?.name || 'N/A',
+        r.quantity.toLocaleString('id-ID'),
+        r.redemptionQuantity.toLocaleString('id-ID'),
+        sisa.toLocaleString('id-ID')
+      ];
+    });
+    exportToPdf('Data Pengeluaran DO', headers, data);
+    toast({
+      title: 'Sukses',
+      description: 'Data pengeluaran DO berhasil diekspor ke PDF.',
+    });
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -413,10 +438,18 @@ export default function PengeluaranDOPage() {
                 <Upload className="mr-2 h-4 w-4" />
                 Impor
             </Button>
-            <Button size="sm" variant="outline" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Ekspor
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Ekspor <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                  <DropdownMenuItem onClick={handleExportPdf}>Ekspor ke PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel}>Ekspor ke Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           {selectedReleases.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

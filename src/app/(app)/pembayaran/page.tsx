@@ -4,9 +4,11 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +42,7 @@ import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
+import { exportToPdf } from '@/lib/pdf-export';
 
 
 const paymentSchema = z.object({
@@ -329,7 +332,7 @@ export default function PembayaranPage() {
     }
   };
   
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredPayments.map(p => ({
         'Tanggal': format(new Date(p.date), 'dd/MM/yyyy'),
         'NO DO': p.doNumber,
@@ -342,8 +345,23 @@ export default function PembayaranPage() {
     XLSX.writeFile(workbook, "DataPembayaran.xlsx");
      toast({
         title: 'Sukses',
-        description: 'Data pembayaran berhasil diekspor.',
+        description: 'Data pembayaran berhasil diekspor ke Excel.',
       });
+  };
+
+  const handleExportPdf = () => {
+    const headers = [['Tanggal', 'NO DO', 'Nama Kios', 'Total Bayar']];
+    const data = sortedAndFilteredPayments.map(p => [
+      format(new Date(p.date), 'dd/MM/yyyy'),
+      p.doNumber,
+      getKioskName(p.kioskId),
+      formatCurrency(p.amount)
+    ]);
+    exportToPdf('Data Pembayaran', headers, data);
+    toast({
+      title: 'Sukses',
+      description: 'Data pembayaran berhasil diekspor ke PDF.',
+    });
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -466,10 +484,18 @@ export default function PembayaranPage() {
                 <Upload className="mr-2 h-4 w-4" />
                 Impor
             </Button>
-            <Button size="sm" variant="outline" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Ekspor
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Ekspor <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                  <DropdownMenuItem onClick={handleExportPdf}>Ekspor ke PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel}>Ekspor ke Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           {selectedPayments.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

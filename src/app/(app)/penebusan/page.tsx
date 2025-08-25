@@ -4,9 +4,11 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +39,7 @@ import type { Redemption, Product, RedemptionInput } from '@/lib/types';
 import { getRedemptions, addRedemption, updateRedemption, deleteRedemption, deleteMultipleRedemptions, addMultipleRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
+import { exportToPdf } from '@/lib/pdf-export';
 
 const redemptionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus diisi' }),
@@ -278,7 +281,7 @@ export default function PenebusanPage() {
     }
   };
   
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredRedemptions.map(r => {
         const product = productMap[r.productId];
         const total = product ? product.purchasePrice * r.quantity : 0;
@@ -297,8 +300,29 @@ export default function PenebusanPage() {
     XLSX.writeFile(workbook, "DataPenebusan.xlsx");
      toast({
         title: 'Sukses',
-        description: 'Data penebusan berhasil diekspor.',
+        description: 'Data penebusan berhasil diekspor ke Excel.',
       });
+  };
+
+  const handleExportPdf = () => {
+    const headers = [['NO DO', 'Supplier', 'Tanggal', 'Nama Produk', 'QTY', 'Total']];
+    const data = sortedAndFilteredRedemptions.map(r => {
+      const product = productMap[r.productId];
+      const total = product ? product.purchasePrice * r.quantity : 0;
+      return [
+        r.doNumber,
+        r.supplier,
+        format(new Date(r.date), 'dd/MM/yyyy'),
+        product?.name || 'N/A',
+        r.quantity.toLocaleString('id-ID'),
+        formatCurrency(total)
+      ];
+    });
+    exportToPdf('Data Penebusan', headers, data);
+    toast({
+      title: 'Sukses',
+      description: 'Data penebusan berhasil diekspor ke PDF.',
+    });
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -424,10 +448,18 @@ export default function PenebusanPage() {
                 <Upload className="mr-2 h-4 w-4" />
                 Impor
             </Button>
-            <Button size="sm" variant="outline" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Ekspor
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Ekspor <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                  <DropdownMenuItem onClick={handleExportPdf}>Ekspor ke PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel}>Ekspor ke Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           {selectedRedemptions.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

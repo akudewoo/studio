@@ -5,6 +5,8 @@ import { useState, useEffect, useRef } from 'react';
 import { format, isWithinInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, subDays, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,6 +24,7 @@ import { getPayments } from '@/services/paymentService';
 import type { Redemption, DORelease, KioskDistribution, Kiosk, Product, Payment } from '@/lib/types';
 import { Download } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { exportToPdf } from '@/lib/pdf-export';
 
 type ReportType = 'harian' | 'mingguan' | 'bulanan';
 
@@ -382,26 +385,42 @@ export default function LaporanPage() {
     }
   };
 
-  const exportToPdf = async () => {
+  const handleExportPdf = () => {
     if (!summary || !reportContentRef.current) {
-      toast({ title: 'Laporan Kosong', description: 'Buat laporan terlebih dahulu.', variant: 'destructive' });
-      return;
+        toast({ title: 'Laporan Kosong', description: 'Buat laporan terlebih dahulu.', variant: 'destructive' });
+        return;
     }
-    
-    const html2pdf = (await import('html2pdf.js')).default;
+    const doc = new jsPDF();
+    const parser = new DOMParser();
+    const htmlDoc = parser.parseFromString(summary, 'text/html');
 
-    const element = document.createElement('div');
-    element.innerHTML = summary;
-
-    const opt = {
-      margin:       0.5,
-      filename:     `${summaryTitle.replace(/ /g, '_')}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false },
-      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
+    // Use querySelector to find all tables
+    const tables = htmlDoc.querySelectorAll('.report-table, .summary-table');
+    const titleEl = htmlDoc.querySelector('h3');
     
-    html2pdf().from(element).set(opt).save();
+    doc.text(titleEl?.innerText || summaryTitle, 14, 15);
+    let startY = 25;
+
+    tables.forEach((table, index) => {
+        const titleEl = table.previousElementSibling;
+        if(titleEl && titleEl.tagName === 'H4') {
+            doc.text(titleEl.textContent || '', 14, startY);
+            startY += 10;
+        }
+
+        (doc as any).autoTable({
+            html: table,
+            startY: startY,
+            theme: 'grid',
+            headStyles: { fillColor: '#020617', textColor: '#ffffff' },
+            didDrawPage: (data: any) => {
+                startY = data.cursor.y + 10;
+            },
+        });
+        startY = (doc as any).lastAutoTable.finalY + 15;
+    });
+
+    doc.save(`${summaryTitle.replace(/ /g, '_')}.pdf`);
   };
 
   const renderCalendar = (
@@ -488,7 +507,7 @@ export default function LaporanPage() {
                      </div>
                    </div>
                 </div>
-                <Button onClick={exportToPdf} disabled={!summary}>
+                <Button onClick={handleExportPdf} disabled={!summary}>
                   <Download className="mr-2 h-4 w-4" /> Ekspor ke PDF
                 </Button>
               </div>
@@ -499,5 +518,3 @@ export default function LaporanPage() {
     </div>
   );
 }
-
-    

@@ -4,8 +4,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +18,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -37,6 +43,7 @@ import { getPayments } from '@/services/paymentService';
 import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
 import { cn } from '@/lib/utils';
+import { exportToPdf } from '@/lib/pdf-export';
 
 
 const kioskSchema = z.object({
@@ -297,7 +304,7 @@ export default function KiosPage() {
     }
   };
   
-  const handleExport = () => {
+  const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredKiosks.map(k => ({
         'Nama Kios': k.name,
         'Penanggung Jawab': k.penanggungJawab,
@@ -313,8 +320,27 @@ export default function KiosPage() {
     XLSX.writeFile(workbook, "DataKios.xlsx");
      toast({
         title: 'Sukses',
-        description: 'Data kios berhasil diekspor.',
+        description: 'Data kios berhasil diekspor ke Excel.',
       });
+  };
+
+  const handleExportPdf = () => {
+    const headers = [['Nama Kios', 'Penanggung Jawab', 'Alamat', 'Desa', 'Kecamatan', 'No. Telepon', 'Tagihan Total']];
+    const data = sortedAndFilteredKiosks.map(k => [
+        k.name,
+        k.penanggungJawab,
+        k.address,
+        k.desa,
+        k.kecamatan,
+        k.phone,
+        formatCurrency(totalBills[k.id] || 0)
+    ]);
+
+    exportToPdf('Data Kios', headers, data);
+    toast({
+      title: 'Sukses',
+      description: 'Data kios berhasil diekspor ke PDF.',
+    });
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -426,10 +452,18 @@ export default function KiosPage() {
               <Upload className="mr-2 h-4 w-4" />
               Impor
           </Button>
-          <Button size="sm" variant="outline" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Ekspor
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                    <Download className="mr-2 h-4 w-4" />
+                    Ekspor <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+                <DropdownMenuItem onClick={handleExportPdf}>Ekspor ke PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel}>Ekspor ke Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
            {selectedKiosks.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />
