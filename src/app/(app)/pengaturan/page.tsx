@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useSettings, type IconType } from '@/hooks/use-settings';
@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 
@@ -63,7 +62,25 @@ export default function PengaturanPage() {
     };
 
     if (!isLoaded) {
-        return <div>Loading settings...</div>;
+        return (
+          <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
+            <h1 className="font-headline text-lg font-semibold md:text-2xl">Pengaturan</h1>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Memuat Pengaturan...</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-8">
+                        <div className="h-10 w-1/3 bg-muted rounded-md animate-pulse" />
+                        <div className="h-10 w-1/3 bg-muted rounded-md animate-pulse" />
+                        <div className="h-10 w-1/3 bg-muted rounded-md animate-pulse" />
+                        <div className="h-20 w-full bg-muted rounded-md animate-pulse" />
+                        <div className="h-10 w-24 bg-muted rounded-md animate-pulse" />
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+        )
     }
 
     return (

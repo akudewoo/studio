@@ -1,8 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Package, GitBranch, Briefcase } from 'lucide-react';
-import { Logo } from '@/components/icons/logo';
 
 export type IconType = 'default' | 'package' | 'git-branch' | 'briefcase';
 
