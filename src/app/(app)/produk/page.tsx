@@ -50,11 +50,20 @@ export default function ProdukPage() {
 
   useEffect(() => {
     async function loadProducts() {
-      const fetchedProducts = await getProducts();
-      setProducts(fetchedProducts);
+      try {
+        const fetchedProducts = await getProducts();
+        setProducts(fetchedProducts);
+      } catch (error) {
+        console.error("Firebase Error: ", error);
+        toast({
+          title: 'Gagal Memuat Produk',
+          description: 'Pastikan konfigurasi Firebase Anda sudah benar dan layanan Firestore telah diaktifkan.',
+          variant: 'destructive',
+        });
+      }
     }
     loadProducts();
-  }, []);
+  }, [toast]);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -125,10 +134,11 @@ export default function ProdukPage() {
   const onSubmit = async (values: z.infer<typeof productSchema>) => {
     try {
       if (editingProduct) {
+        const updatedProduct = { ...editingProduct, ...values };
         await updateProduct(editingProduct.id, values);
         setProducts(
           products.map((p) =>
-            p.id === editingProduct.id ? { ...p, ...values } : p
+            p.id === editingProduct.id ? updatedProduct : p
           )
         );
         toast({

@@ -4,12 +4,13 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  "projectId": "alur-distribusi",
+  "appId": "1:844802255380:web:5485d5ed43717bd6c29501",
+  "storageBucket": "alur-distribusi.firebasestorage.app",
+  "apiKey": "AIzaSyC5Nz9l6wcUs5c-HqsrhR6kXJmar-dX0j4",
+  "authDomain": "alur-distribusi.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "844802255380"
 };
 
 // Initialize Firebase
