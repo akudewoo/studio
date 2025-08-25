@@ -96,10 +96,12 @@ export default function LaporanHarianPage() {
 
         // Penyaluran per kios
         const distByKiosk: Record<string, { product: string, quantity: number }[]> = {};
+        let totalDistribution = 0;
         dailyDistributions.forEach(dist => {
           const kioskName = kioskMap[dist.kioskId] || 'Kios tidak diketahui';
           const productId = redemptionProductMap[dist.doNumber];
           const productName = productId ? productMap[productId] : 'Produk tidak diketahui';
+          totalDistribution += dist.quantity;
 
           if (!distByKiosk[kioskName]) {
             distByKiosk[kioskName] = [];
@@ -111,6 +113,8 @@ export default function LaporanHarianPage() {
         const formattedDate = format(selectedDate, 'd MMMM yyyy', { locale: id });
         let manualSummary = `*Laporan Harian - ${formattedDate}*\n\n`;
         manualSummary += `📈 *Aktivitas Utama:*\n\n`;
+        
+        manualSummary += `*Total Penyaluran Kios: ${totalDistribution.toLocaleString('id-ID')} Ton*\n\n`;
 
         manualSummary += `*Penebusan per Produk:*\n`;
         if (Object.keys(redemptionByProduct).length > 0) {
@@ -132,7 +136,7 @@ export default function LaporanHarianPage() {
         }
         manualSummary += `\n`;
         
-        manualSummary += `🚚 *Penyaluran Kios:*\n`;
+        manualSummary += `🚚 *Rincian Penyaluran Kios:*\n`;
         if (Object.keys(distByKiosk).length > 0) {
             for (const kioskName in distByKiosk) {
                 manualSummary += `- *${kioskName}*:\n`;
@@ -237,3 +241,5 @@ export default function LaporanHarianPage() {
     </div>
   );
 }
+
+    
