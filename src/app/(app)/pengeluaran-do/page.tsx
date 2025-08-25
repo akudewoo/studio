@@ -95,7 +95,7 @@ export default function PengeluaranDOPage() {
     if (release && redemption) {
       form.reset({
         ...release,
-        date: format(new Date(release.date), 'yyyy-MM-dd'),
+        date: format(new Date(release.date), 'yyyy-M-d'),
       });
     } else {
       form.reset({
