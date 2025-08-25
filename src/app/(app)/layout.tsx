@@ -43,16 +43,23 @@ const AppSidebar = () => {
     const { settings, isLoaded } = useSettings();
     const pathname = usePathname();
     const { isMobile, open, setOpen } = useSidebar();
+    const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
-        if(isLoaded) {
+        setMounted(true);
+    }, []);
+
+    React.useEffect(() => {
+        if(isLoaded && !isMobile) {
             setOpen(settings.sidebarOpen);
         }
-    }, [isLoaded, settings.sidebarOpen, setOpen]);
+    }, [isLoaded, settings.sidebarOpen, setOpen, isMobile]);
     
     const Logo = isLoaded && settings.appIcon ? getIcon(settings.appIcon) : DefaultLogo;
+    
+    const isLoading = !isLoaded || !mounted;
 
-    if (!isLoaded) {
+    if (isLoading) {
         return (
              <Sidebar
                 collapsible={isMobile ? 'offcanvas' : 'icon'}
@@ -158,75 +165,14 @@ const AppSidebar = () => {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { settings, isLoaded } = useSettings();
-  const [mounted, setMounted] = React.useState(false);
 
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!isLoaded) {
-    return (
-        <SidebarProvider>
-            <AppSidebar />
-            <SidebarInset>
-                <div className="flex-1 p-4 space-y-4">
-                   <div className="h-8 w-48 bg-muted rounded-md animate-pulse" />
-                   <div className="h-40 w-full bg-muted rounded-md animate-pulse" />
-                   <div className="h-80 w-full bg-muted rounded-md animate-pulse" />
-                </div>
-            </SidebarInset>
-        </SidebarProvider>
-    )
-  }
   return (
     <SidebarProvider>
-        {mounted ? <AppSidebar /> : (
-            <Sidebar
-                collapsible={'icon'}
-                variant="sidebar"
-            >
-             <SidebarHeader>
-                <Button
-                    variant="ghost"
-                    className="h-10 w-full justify-start px-2 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center"
-                    asChild
-                >
-                    <Link href="/produk">
-                        <DefaultLogo className="size-6 shrink-0 text-primary" />
-                        <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                            AlurDistribusi
-                        </span>
-                    </Link>
-                </Button>
-            </SidebarHeader>
-            <SidebarContent>
-                <SidebarMenu>
-                {[...Array(6)].map((_, i) => (
-                    <SidebarMenuItem key={i}>
-                        <SidebarMenuButton>
-                            <div className="size-4 bg-muted rounded-md animate-pulse" />
-                            <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                ))}
-                </SidebarMenu>
-            </SidebarContent>
-            <SidebarContent className="!flex-grow-0">
-                 <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton>
-                           <div className="size-4 bg-muted rounded-md animate-pulse" />
-                           <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarContent>
-        </Sidebar>
-        )}
+      <AppSidebar />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
           <SidebarTrigger />
-          <h1 className="font-headline text-lg font-semibold">{settings.appName}</h1>
+          <h1 className="font-headline text-lg font-semibold">{isLoaded ? settings.appName : "AlurDistribusi"}</h1>
         </header>
         {children}
       </SidebarInset>
