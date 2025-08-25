@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -50,6 +50,11 @@ const doReleaseImportSchema = doReleaseSchema.extend({
     redemptionQuantity: z.number(),
 });
 
+type SortConfig = {
+  key: keyof DORelease | 'productName' | 'sisaPenebusan';
+  direction: 'ascending' | 'descending';
+} | null;
+
 export default function PengeluaranDOPage() {
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -58,6 +63,7 @@ export default function PengeluaranDOPage() {
   const [editingRelease, setEditingRelease] = useState<DORelease | null>(null);
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,16 +98,69 @@ export default function PengeluaranDOPage() {
     }, {} as Record<string, Product>);
   }, [products]);
   
-  const filteredDoReleases = useMemo(() => {
-    if (!searchQuery) return doReleases;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return doReleases.filter(release => {
-      const redemption = redemptionMap[release.doNumber];
-      const product = redemption ? productMap[redemption.productId] : null;
-      return release.doNumber.toLowerCase().includes(lowercasedQuery) ||
-             (product && product.name.toLowerCase().includes(lowercasedQuery));
-    });
-  }, [doReleases, searchQuery, redemptionMap, productMap]);
+  const sisaPenebusanByDO = useMemo(() => {
+      const sisa: Record<string, number> = {};
+      redemptions.forEach(r => {
+        const totalReleased = doReleases.filter(d => d.doNumber === r.doNumber).reduce((sum, rel) => sum + rel.quantity, 0);
+        sisa[r.doNumber] = r.quantity - totalReleased;
+      });
+      return sisa;
+  }, [doReleases, redemptions]);
+
+  const sortedAndFilteredDoReleases = useMemo(() => {
+    let filterableReleases = [...doReleases];
+
+    if (searchQuery) {
+        filterableReleases = filterableReleases.filter(release => {
+          const redemption = redemptionMap[release.doNumber];
+          const product = redemption ? productMap[redemption.productId] : null;
+          return release.doNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                 (product && product.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        });
+    }
+    
+    if (sortConfig !== null) {
+      filterableReleases.sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+        
+        const redemptionA = redemptionMap[a.doNumber];
+        const redemptionB = redemptionMap[b.doNumber];
+
+        if (sortConfig.key === 'productName') {
+            const productA = redemptionA ? productMap[redemptionA.productId] : null;
+            const productB = redemptionB ? productMap[redemptionB.productId] : null;
+            aValue = productA?.name || '';
+            bValue = productB?.name || '';
+        } else if (sortConfig.key === 'sisaPenebusan') {
+            aValue = sisaPenebusanByDO[a.doNumber] ?? 0;
+            bValue = sisaPenebusanByDO[b.doNumber] ?? 0;
+        } else {
+            aValue = a[sortConfig.key as keyof DORelease];
+            bValue = b[sortConfig.key as keyof DORelease];
+        }
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return filterableReleases;
+  }, [doReleases, searchQuery, sortConfig, redemptionMap, productMap, sisaPenebusanByDO]);
+
+  const requestSort = (key: keyof DORelease | 'productName' | 'sisaPenebusan') => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
 
   const form = useForm<z.infer<typeof doReleaseSchema>>({
     resolver: zodResolver(doReleaseSchema),
@@ -208,19 +267,10 @@ export default function PengeluaranDOPage() {
        toast({ title: 'Error', description: 'Gagal menyimpan data pengeluaran DO.', variant: 'destructive' });
     }
   };
-  
-  const sisaPenebusanByDO = useMemo(() => {
-      const sisa: Record<string, number> = {};
-      redemptions.forEach(r => {
-        const totalReleased = doReleases.filter(d => d.doNumber === r.doNumber).reduce((sum, rel) => sum + rel.quantity, 0);
-        sisa[r.doNumber] = r.quantity - totalReleased;
-      });
-      return sisa;
-  }, [doReleases, redemptions]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedReleases(filteredDoReleases.map(r => r.id));
+      setSelectedReleases(sortedAndFilteredDoReleases.map(r => r.id));
     } else {
       setSelectedReleases([]);
     }
@@ -235,7 +285,7 @@ export default function PengeluaranDOPage() {
   };
 
   const handleExport = () => {
-    const dataToExport = filteredDoReleases.map(r => {
+    const dataToExport = sortedAndFilteredDoReleases.map(r => {
         const redemption = redemptionMap[r.doNumber];
         const product = redemption ? productMap[redemption.productId] : null;
         const sisa = sisaPenebusanByDO[r.doNumber] ?? 0;
@@ -380,22 +430,22 @@ export default function PengeluaranDOPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={filteredDoReleases.length > 0 && selectedReleases.length === filteredDoReleases.length}
+                    checked={sortedAndFilteredDoReleases.length > 0 && selectedReleases.length === sortedAndFilteredDoReleases.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>NO DO</TableHead>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>Nama Produk</TableHead>
-                <TableHead className="text-right">QTY DO</TableHead>
-                <TableHead className="text-right">QTY Penebusan</TableHead>
-                <TableHead className="text-right">Sisa Penebusan</TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('redemptionQuantity')}>QTY Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('sisaPenebusan')}>Sisa Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredDoReleases.map((release) => {
+              {sortedAndFilteredDoReleases.map((release) => {
                 const redemption = redemptionMap[release.doNumber];
                 const product = redemption ? productMap[redemption.productId] : null;
                 const sisa = sisaPenebusanByDO[release.doNumber] ?? 0;

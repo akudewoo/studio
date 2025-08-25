@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Kiosk, KioskDistribution, Payment, Product, Redemption, KioskInput } from '@/lib/types';
 import { getKiosks, addKiosk, updateKiosk, deleteKiosk, deleteMultipleKiosks, addMultipleKiosks } from '@/services/kioskService';
@@ -46,6 +47,11 @@ const kioskSchema = z.object({
   penanggungJawab: z.string().min(1, { message: 'Penanggung Jawab harus diisi' }),
 });
 
+type SortConfig = {
+  key: keyof Kiosk | 'totalBills';
+  direction: 'ascending' | 'descending';
+} | null;
+
 export default function KiosPage() {
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
@@ -56,6 +62,8 @@ export default function KiosPage() {
   const [editingKiosk, setEditingKiosk] = useState<Kiosk | null>(null);
   const [selectedKiosks, setSelectedKiosks] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [kecamatanFilter, setKecamatanFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,19 +89,6 @@ export default function KiosPage() {
   
   const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
-  const filteredKiosks = useMemo(() => {
-    if (!searchQuery) return kiosks;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return kiosks.filter(kiosk =>
-      kiosk.name.toLowerCase().includes(lowercasedQuery) ||
-      kiosk.penanggungJawab.toLowerCase().includes(lowercasedQuery) ||
-      kiosk.address.toLowerCase().includes(lowercasedQuery) ||
-      kiosk.desa.toLowerCase().includes(lowercasedQuery) ||
-      kiosk.kecamatan.toLowerCase().includes(lowercasedQuery) ||
-      kiosk.phone.toLowerCase().includes(lowercasedQuery)
-    );
-  }, [kiosks, searchQuery]);
-
   const totalBills = useMemo(() => {
     const bills: Record<string, number> = {};
 
@@ -116,6 +111,59 @@ export default function KiosPage() {
 
     return bills;
   }, [kiosks, distributions, payments, products, redemptions]);
+  
+  const sortedAndFilteredKiosks = useMemo(() => {
+    let filterableKiosks = [...kiosks];
+
+    if (searchQuery) {
+        filterableKiosks = filterableKiosks.filter(kiosk =>
+            Object.values(kiosk).some(value => 
+                String(value).toLowerCase().includes(searchQuery.toLowerCase())
+            )
+        );
+    }
+    
+    if (kecamatanFilter !== 'all') {
+        filterableKiosks = filterableKiosks.filter(k => k.kecamatan === kecamatanFilter);
+    }
+    
+    if (sortConfig !== null) {
+      filterableKiosks.sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+
+        if (sortConfig.key === 'totalBills') {
+          aValue = totalBills[a.id] || 0;
+          bValue = totalBills[b.id] || 0;
+        } else {
+          aValue = a[sortConfig.key as keyof Kiosk];
+          bValue = b[sortConfig.key as keyof Kiosk];
+        }
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return filterableKiosks;
+  }, [kiosks, searchQuery, kecamatanFilter, sortConfig, totalBills]);
+
+  const requestSort = (key: keyof Kiosk | 'totalBills') => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const uniqueKecamatan = useMemo(() => {
+    return [...new Set(kiosks.map(k => k.kecamatan))];
+  }, [kiosks]);
 
 
   const form = useForm<z.infer<typeof kioskSchema>>({
@@ -215,7 +263,7 @@ export default function KiosPage() {
   
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedKiosks(filteredKiosks.map(k => k.id));
+      setSelectedKiosks(sortedAndFilteredKiosks.map(k => k.id));
     } else {
       setSelectedKiosks([]);
     }
@@ -230,7 +278,7 @@ export default function KiosPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = filteredKiosks.map(k => ({
+    const dataToExport = sortedAndFilteredKiosks.map(k => ({
         'Nama Kios': k.name,
         'Penanggung Jawab': k.penanggungJawab,
         'Alamat': k.address,
@@ -317,15 +365,24 @@ export default function KiosPage() {
         <h1 className="font-headline text-lg font-semibold md:text-2xl">
           Data Kios
         </h1>
-        <div className="relative ml-auto flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Cari..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              placeholder="Cari Kios..."
+              className="w-full rounded-lg bg-background md:w-[200px] lg:w-[250px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+             <Select value={kecamatanFilter} onValueChange={setKecamatanFilter}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter Kecamatan" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Semua Kecamatan</SelectItem>
+                    {uniqueKecamatan.map(kec => <SelectItem key={kec} value={kec}>{kec}</SelectItem>)}
+                </SelectContent>
+            </Select>
         </div>
         <div className="flex items-center gap-2">
            <input
@@ -363,23 +420,23 @@ export default function KiosPage() {
               <TableRow>
                  <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={filteredKiosks.length > 0 && selectedKiosks.length === filteredKiosks.length}
+                    checked={sortedAndFilteredKiosks.length > 0 && selectedKiosks.length === sortedAndFilteredKiosks.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>Nama Kios</TableHead>
-                <TableHead>Penanggung Jawab</TableHead>
-                <TableHead>Alamat</TableHead>
-                <TableHead>Desa</TableHead>
-                <TableHead>Kecamatan</TableHead>
-                <TableHead>No. Telepon</TableHead>
-                <TableHead className="text-right">Tagihan Total</TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('name')}>Nama Kios <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('penanggungJawab')}>Penanggung Jawab <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('address')}>Alamat <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('desa')}>Desa <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('kecamatan')}>Kecamatan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('phone')}>No. Telepon <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('totalBills')}>Tagihan Total <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredKiosks.map((kiosk) => (
+              {sortedAndFilteredKiosks.map((kiosk) => (
                 <TableRow key={kiosk.id} data-state={selectedKiosks.includes(kiosk.id) && "selected"}>
                    <TableCell>
                     <Checkbox

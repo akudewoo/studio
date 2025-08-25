@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -46,6 +46,11 @@ const redemptionSchema = z.object({
   quantity: z.coerce.number().min(1, { message: 'QTY harus lebih dari 0' }),
 });
 
+type SortConfig = {
+  key: keyof Redemption | 'productName' | 'total';
+  direction: 'ascending' | 'descending';
+} | null;
+
 export default function PenebusanPage() {
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -53,6 +58,8 @@ export default function PenebusanPage() {
   const [editingRedemption, setEditingRedemption] = useState<Redemption | null>(null);
   const [selectedRedemptions, setSelectedRedemptions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -78,16 +85,65 @@ export default function PenebusanPage() {
       return map;
     }, {} as Record<string, Product>);
   }, [products]);
+  
+  const sortedAndFilteredRedemptions = useMemo(() => {
+    let filterableRedemptions = [...redemptions];
 
-  const filteredRedemptions = useMemo(() => {
-    if (!searchQuery) return redemptions;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return redemptions.filter(redemption =>
-      redemption.doNumber.toLowerCase().includes(lowercasedQuery) ||
-      redemption.supplier.toLowerCase().includes(lowercasedQuery) ||
-      (productMap[redemption.productId]?.name.toLowerCase().includes(lowercasedQuery))
-    );
-  }, [redemptions, searchQuery, productMap]);
+    if (searchQuery) {
+        filterableRedemptions = filterableRedemptions.filter(redemption =>
+          redemption.doNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          redemption.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (productMap[redemption.productId]?.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+    }
+    
+    if (supplierFilter !== 'all') {
+        filterableRedemptions = filterableRedemptions.filter(r => r.supplier === supplierFilter);
+    }
+
+    if (sortConfig !== null) {
+      filterableRedemptions.sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+
+        if (sortConfig.key === 'productName') {
+            aValue = productMap[a.productId]?.name || '';
+            bValue = productMap[b.productId]?.name || '';
+        } else if (sortConfig.key === 'total') {
+            const productA = productMap[a.productId];
+            const productB = productMap[b.productId];
+            aValue = productA ? productA.purchasePrice * a.quantity : 0;
+            bValue = productB ? productB.purchasePrice * b.quantity : 0;
+        } else {
+            aValue = a[sortConfig.key as keyof Redemption];
+            bValue = b[sortConfig.key as keyof Redemption];
+        }
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return filterableRedemptions;
+  }, [redemptions, searchQuery, supplierFilter, sortConfig, productMap]);
+
+  const requestSort = (key: keyof Redemption | 'productName' | 'total') => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const uniqueSuppliers = useMemo(() => {
+    return [...new Set(redemptions.map(r => r.supplier))];
+  }, [redemptions]);
+
 
   const form = useForm<z.infer<typeof redemptionSchema>>({
     resolver: zodResolver(redemptionSchema),
@@ -193,7 +249,7 @@ export default function PenebusanPage() {
   
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedRedemptions(filteredRedemptions.map(r => r.id));
+      setSelectedRedemptions(sortedAndFilteredRedemptions.map(r => r.id));
     } else {
       setSelectedRedemptions([]);
     }
@@ -208,7 +264,7 @@ export default function PenebusanPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = filteredRedemptions.map(r => {
+    const dataToExport = sortedAndFilteredRedemptions.map(r => {
         const product = productMap[r.productId];
         const total = product ? product.purchasePrice * r.quantity : 0;
         return {
@@ -311,15 +367,24 @@ export default function PenebusanPage() {
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penebusan</h1>
-        <div className="relative ml-auto flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Cari..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              className="w-full rounded-lg bg-background md:w-[200px] lg:w-[250px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter Supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Semua Supplier</SelectItem>
+                    {uniqueSuppliers.map(sup => <SelectItem key={sup} value={sup}>{sup}</SelectItem>)}
+                </SelectContent>
+            </Select>
         </div>
         <div className="flex items-center gap-2">
             <input
@@ -357,22 +422,22 @@ export default function PenebusanPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={filteredRedemptions.length > 0 && selectedRedemptions.length === filteredRedemptions.length}
+                    checked={sortedAndFilteredRedemptions.length > 0 && selectedRedemptions.length === sortedAndFilteredRedemptions.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>NO DO</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>Nama Produk</TableHead>
-                <TableHead className="text-right">QTY</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('supplier')}>Supplier <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('total')}>Total <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRedemptions.map((redemption) => {
+              {sortedAndFilteredRedemptions.map((redemption) => {
                 const product = productMap[redemption.productId];
                 const total = product ? product.purchasePrice * redemption.quantity : 0;
                 return (

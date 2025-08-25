@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -50,6 +50,11 @@ const distributionSchema = z.object({
   directPayment: z.coerce.number().min(0, { message: 'Pembayaran harus positif' }),
 });
 
+type SortConfig = {
+  key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'kurangBayar';
+  direction: 'ascending' | 'descending';
+} | null;
+
 export default function PenyaluranKiosPage() {
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
@@ -61,6 +66,8 @@ export default function PenyaluranKiosPage() {
   const [editingDist, setEditingDist] = useState<KioskDistribution | null>(null);
   const [selectedDists, setSelectedDists] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [kioskFilter, setKioskFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,17 +99,78 @@ export default function PenyaluranKiosPage() {
     const doRelease = doReleases.find(d => d.doNumber === doNumber);
     return { redemption, product, doRelease };
   }
+  
+  const sortedAndFilteredDistributions = useMemo(() => {
+    let filterableDistributions = [...distributions];
 
-  const filteredDistributions = useMemo(() => {
-    if (!searchQuery) return distributions;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return distributions.filter(dist => {
-      const { product } = getDetails(dist.doNumber);
-      return dist.doNumber.toLowerCase().includes(lowercasedQuery) ||
-             getKioskName(dist.kioskId).toLowerCase().includes(lowercasedQuery) ||
-             (product && product.name.toLowerCase().includes(lowercasedQuery));
-    });
-  }, [distributions, searchQuery, kiosks, redemptions, products]);
+    if (searchQuery) {
+        filterableDistributions = filterableDistributions.filter(dist => {
+            const { product } = getDetails(dist.doNumber);
+            return dist.doNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                   getKioskName(dist.kioskId).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                   (product && product.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        });
+    }
+
+    if (kioskFilter !== 'all') {
+        filterableDistributions = filterableDistributions.filter(d => d.kioskId === kioskFilter);
+    }
+    
+    if (sortConfig !== null) {
+      filterableDistributions.sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+        
+        const { product: productA } = getDetails(a.doNumber);
+        const { product: productB } = getDetails(b.doNumber);
+
+        switch (sortConfig.key) {
+            case 'productName':
+                aValue = productA?.name || '';
+                bValue = productB?.name || '';
+                break;
+            case 'kioskName':
+                aValue = getKioskName(a.kioskId);
+                bValue = getKioskName(b.kioskId);
+                break;
+            case 'total':
+                aValue = productA ? a.quantity * productA.sellPrice : 0;
+                bValue = productB ? b.quantity * productB.sellPrice : 0;
+                break;
+            case 'kurangBayar':
+                const totalA = productA ? a.quantity * productA.sellPrice : 0;
+                const totalTempoA = payments.filter(p => p.doNumber === a.doNumber && p.kioskId === a.kioskId).reduce((sum, p) => sum + p.amount, 0);
+                aValue = totalA - a.directPayment - totalTempoA;
+
+                const totalB = productB ? b.quantity * productB.sellPrice : 0;
+                const totalTempoB = payments.filter(p => p.doNumber === b.doNumber && p.kioskId === b.kioskId).reduce((sum, p) => sum + p.amount, 0);
+                bValue = totalB - b.directPayment - totalTempoB;
+                break;
+            default:
+                aValue = a[sortConfig.key as keyof KioskDistribution];
+                bValue = b[sortConfig.key as keyof KioskDistribution];
+        }
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return filterableDistributions;
+  }, [distributions, searchQuery, kioskFilter, sortConfig, kiosks, redemptions, products, payments]);
+
+  const requestSort = (key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'kurangBayar') => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const form = useForm<z.infer<typeof distributionSchema>>({
     resolver: zodResolver(distributionSchema),
@@ -192,7 +260,7 @@ export default function PenyaluranKiosPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedDists(filteredDistributions.map(d => d.id));
+      setSelectedDists(sortedAndFilteredDistributions.map(d => d.id));
     } else {
       setSelectedDists([]);
     }
@@ -207,7 +275,7 @@ export default function PenyaluranKiosPage() {
   };
 
   const handleExport = () => {
-    const dataToExport = filteredDistributions.map(dist => {
+    const dataToExport = sortedAndFilteredDistributions.map(dist => {
         const { product } = getDetails(dist.doNumber);
         const total = product ? dist.quantity * product.sellPrice : 0;
         const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
@@ -313,15 +381,24 @@ export default function PenyaluranKiosPage() {
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penyaluran Kios</h1>
-        <div className="relative ml-auto flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Cari..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              className="w-full rounded-lg bg-background md:w-[200px] lg:w-[250px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+             <Select value={kioskFilter} onValueChange={setKioskFilter}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter Kios" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Semua Kios</SelectItem>
+                    {kiosks.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
+                </SelectContent>
+            </Select>
         </div>
         <div className="flex items-center gap-2">
             <input
@@ -356,18 +433,23 @@ export default function PenyaluranKiosPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={filteredDistributions.length > 0 && selectedDists.length === filteredDistributions.length}
+                    checked={sortedAndFilteredDistributions.length > 0 && selectedDists.length === sortedAndFilteredDistributions.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>NO DO</TableHead><TableHead>Tanggal</TableHead><TableHead>Nama Produk</TableHead>
-                <TableHead>Nama Kios</TableHead><TableHead className="text-right">QTY</TableHead><TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Kurang Bayar</TableHead><TableHead className="w-[50px]"></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('total')}>Total<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('kurangBayar')}>Kurang Bayar<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredDistributions.map((dist) => {
+              {sortedAndFilteredDistributions.map((dist) => {
                 const { product } = getDetails(dist.doNumber);
                 const total = product ? dist.quantity * product.sellPrice : 0;
                 const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);

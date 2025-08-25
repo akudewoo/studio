@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -46,6 +46,11 @@ const paymentSchema = z.object({
   kioskId: z.string().min(1, { message: 'Kios harus dipilih' }),
   amount: z.coerce.number().min(1, { message: 'Jumlah bayar harus lebih dari 0' }),
 });
+
+type SortConfig = {
+  key: keyof Payment | 'kioskName';
+  direction: 'ascending' | 'descending';
+} | null;
 
 function OutstandingBalanceDisplay({ control, distributions, redemptions, products, payments, editingPayment }: { control: any, distributions: KioskDistribution[], redemptions: Redemption[], products: Product[], payments: Payment[], editingPayment: Payment | null }) {
     const doNumber = useWatch({ control, name: 'doNumber' });
@@ -92,6 +97,8 @@ export default function PembayaranPage() {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [kioskFilter, setKioskFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,14 +123,53 @@ export default function PembayaranPage() {
 
   const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
   
-  const filteredPayments = useMemo(() => {
-    if (!searchQuery) return payments;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return payments.filter(payment =>
-      payment.doNumber.toLowerCase().includes(lowercasedQuery) ||
-      getKioskName(payment.kioskId).toLowerCase().includes(lowercasedQuery)
-    );
-  }, [payments, searchQuery, kiosks]);
+  const sortedAndFilteredPayments = useMemo(() => {
+    let filterablePayments = [...payments];
+
+    if (searchQuery) {
+        filterablePayments = filterablePayments.filter(payment =>
+          payment.doNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          getKioskName(payment.kioskId).toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }
+    
+    if (kioskFilter !== 'all') {
+        filterablePayments = filterablePayments.filter(p => p.kioskId === kioskFilter);
+    }
+    
+    if (sortConfig !== null) {
+      filterablePayments.sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+
+        if (sortConfig.key === 'kioskName') {
+          aValue = getKioskName(a.kioskId);
+          bValue = getKioskName(b.kioskId);
+        } else {
+          aValue = a[sortConfig.key as keyof Payment];
+          bValue = b[sortConfig.key as keyof Payment];
+        }
+        
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return filterablePayments;
+  }, [payments, searchQuery, kioskFilter, sortConfig, kiosks]);
+  
+  const requestSort = (key: keyof Payment | 'kioskName') => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
 
 
   const form = useForm<z.infer<typeof paymentSchema>>({
@@ -226,7 +272,7 @@ export default function PembayaranPage() {
   
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedPayments(filteredPayments.map(p => p.id));
+      setSelectedPayments(sortedAndFilteredPayments.map(p => p.id));
     } else {
       setSelectedPayments([]);
     }
@@ -241,7 +287,7 @@ export default function PembayaranPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = filteredPayments.map(p => ({
+    const dataToExport = sortedAndFilteredPayments.map(p => ({
         'Tanggal': format(new Date(p.date), 'dd/MM/yyyy'),
         'NO DO': p.doNumber,
         'Nama Kios': getKioskName(p.kioskId),
@@ -335,15 +381,24 @@ export default function PembayaranPage() {
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pembayaran</h1>
-        <div className="relative ml-auto flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Cari..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              className="w-full rounded-lg bg-background md:w-[200px] lg:w-[250px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <Select value={kioskFilter} onValueChange={setKioskFilter}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter Kios" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Semua Kios</SelectItem>
+                    {kiosks.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
+                </SelectContent>
+            </Select>
         </div>
         <div className="flex items-center gap-2">
             <input
@@ -378,20 +433,20 @@ export default function PembayaranPage() {
               <TableRow>
                  <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={filteredPayments.length > 0 && selectedPayments.length === filteredPayments.length}
+                    checked={sortedAndFilteredPayments.length > 0 && selectedPayments.length === sortedAndFilteredPayments.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>NO DO</TableHead>
-                <TableHead>Nama Kios</TableHead>
-                <TableHead className="text-right">Total Bayar</TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('amount')}>Total Bayar<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPayments.map((payment) => (
+              {sortedAndFilteredPayments.map((payment) => (
                 <TableRow key={payment.id} data-state={selectedPayments.includes(payment.id) && "selected"}>
                   <TableCell>
                     <Checkbox
