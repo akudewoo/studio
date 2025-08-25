@@ -115,7 +115,7 @@ export default function LaporanHarianPage() {
         manualSummary += `*Penebusan per Produk:*\n`;
         if (Object.keys(redemptionByProduct).length > 0) {
             for(const productName in redemptionByProduct) {
-                manualSummary += `- ${productName}: *${redemptionByProduct[productName].toLocaleString('id-ID')} Kg*\n`;
+                manualSummary += `- ${productName}: *${redemptionByProduct[productName].toLocaleString('id-ID')} Ton*\n`;
             }
         } else {
             manualSummary += `- Tidak ada data penebusan hari ini.\n`;
@@ -125,7 +125,7 @@ export default function LaporanHarianPage() {
         manualSummary += `*Pengeluaran DO per Produk:*\n`;
         if (Object.keys(doReleaseByProduct).length > 0) {
             for(const productName in doReleaseByProduct) {
-                manualSummary += `- ${productName}: *${doReleaseByProduct[productName].toLocaleString('id-ID')} Kg*\n`;
+                manualSummary += `- ${productName}: *${doReleaseByProduct[productName].toLocaleString('id-ID')} Ton*\n`;
             }
         } else {
             manualSummary += `- Tidak ada data pengeluaran DO hari ini.\n`;
@@ -137,7 +137,7 @@ export default function LaporanHarianPage() {
             for (const kioskName in distByKiosk) {
                 manualSummary += `- *${kioskName}*:\n`;
                 distByKiosk[kioskName].forEach(item => {
-                    manualSummary += `  • ${item.product}: ${item.quantity.toLocaleString('id-ID')} Kg\n`;
+                    manualSummary += `  • ${item.product}: ${item.quantity.toLocaleString('id-ID')} Ton\n`;
                 });
             }
         } else {
