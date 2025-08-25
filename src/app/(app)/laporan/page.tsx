@@ -296,7 +296,11 @@ export default function LaporanPage() {
       const dailyDoReleases = doReleases.filter(dr => dateFilter(new Date(dr.date)));
       const dailyDistributions = distributions.filter(d => dateFilter(new Date(d.date)));
 
-      let generatedSummary = tableStyles;
+      let generatedSummary = `
+        ${tableStyles}
+        <div class="report-container">
+            <h3 class="text-center">${title}</h3>
+      `;
 
       // Penebusan
       let totalRedemption = 0;
@@ -306,7 +310,7 @@ export default function LaporanPage() {
         const productName = productMap[r.productId] || 'Produk tidak diketahui';
         redemptionByProduct[productName] = (redemptionByProduct[productName] || 0) + r.quantity;
       });
-      generatedSummary += `<div><h4>Penebusan</h4>`;
+      generatedSummary += `<div class='mt-4'><h4>Penebusan</h4>`;
       if (Object.keys(redemptionByProduct).length > 0) {
         generatedSummary += `<table class="report-table"><thead><tr><th>Nama Produk</th><th class="text-right">QTY (Ton)</th></tr></thead><tbody>`;
         for (const productName in redemptionByProduct) {
@@ -369,7 +373,7 @@ export default function LaporanPage() {
       } else {
         generatedSummary += `<p class='text-muted-foreground'>- Tidak ada data.</p>`;
       }
-      generatedSummary += `</div>`;
+      generatedSummary += `</div></div>`;
 
       setSummary(generatedSummary);
 
