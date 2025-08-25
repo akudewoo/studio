@@ -167,7 +167,7 @@ export default function PenyaluranKiosPage() {
                 return (
                   <TableRow key={dist.id}>
                     <TableCell className="font-medium">{dist.doNumber}</TableCell>
-                    <TableCell>{format(new Date(dist.date), 'd MMM yyyy', { locale: id })}</TableCell>
+                    <TableCell>{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'N/A'}</TableCell>
                     <TableCell>{getKioskName(dist.kioskId)}</TableCell>
                     <TableCell className="text-right">{dist.quantity.toLocaleString('id-ID')}</TableCell>

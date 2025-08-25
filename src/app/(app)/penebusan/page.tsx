@@ -189,7 +189,7 @@ export default function PenebusanPage() {
                   <TableRow key={redemption.id}>
                     <TableCell className="font-medium">{redemption.doNumber}</TableCell>
                     <TableCell>{redemption.supplier}</TableCell>
-                    <TableCell>{format(new Date(redemption.date), 'd MMMM yyyy', { locale: id })}</TableCell>
+                    <TableCell>{format(new Date(redemption.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'Produk tidak ditemukan'}</TableCell>
                     <TableCell className="text-right">{redemption.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-right">{formatCurrency(total)}</TableCell>

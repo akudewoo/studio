@@ -147,7 +147,7 @@ export default function PembayaranPage() {
             <TableBody>
               {payments.map((payment) => (
                 <TableRow key={payment.id}>
-                  <TableCell>{format(new Date(payment.date), 'd MMMM yyyy', { locale: id })}</TableCell>
+                  <TableCell>{format(new Date(payment.date), 'dd/MM/yyyy')}</TableCell>
                   <TableCell className="font-medium">{payment.doNumber}</TableCell>
                   <TableCell>{getKioskName(payment.kioskId)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>

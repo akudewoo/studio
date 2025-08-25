@@ -205,7 +205,7 @@ export default function PengeluaranDOPage() {
                 return (
                   <TableRow key={release.id}>
                     <TableCell className="font-medium">{release.doNumber}</TableCell>
-                    <TableCell>{format(new Date(release.date), 'd MMMM yyyy', { locale: id })}</TableCell>
+                    <TableCell>{format(new Date(release.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'N/A'}</TableCell>
                     <TableCell className="text-right">{release.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-right">{release.redemptionQuantity.toLocaleString('id-ID')}</TableCell>
