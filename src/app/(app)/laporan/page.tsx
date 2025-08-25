@@ -1,16 +1,15 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format, isWithinInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
+import html2pdf from 'html2pdf.js';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -20,7 +19,7 @@ import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import type { Redemption, DORelease, KioskDistribution, Kiosk, Product } from '@/lib/types';
-import { MessageCircle } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type ReportType = 'harian' | 'mingguan' | 'bulanan';
@@ -31,7 +30,7 @@ export default function LaporanPage() {
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>();
   
   const [summary, setSummary] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [summaryTitle, setSummaryTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -42,6 +41,8 @@ export default function LaporanPage() {
   
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
+  const reportContentRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     setMounted(true);
@@ -90,7 +91,7 @@ export default function LaporanPage() {
           return;
         }
         dateForReport = selectedDate;
-        title = `Ringkasan Harian - ${format(dateForReport, 'd MMMM yyyy', { locale: id })}`;
+        title = `Laporan Harian - ${format(dateForReport, 'd MMMM yyyy', { locale: id })}`;
         dateFilter = (date) => isSameDay(date, dateForReport!);
         break;
       case 'mingguan':
@@ -101,7 +102,7 @@ export default function LaporanPage() {
         dateForReport = selectedWeek;
         const weekStart = startOfWeek(dateForReport, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(dateForReport, { weekStartsOn: 1 });
-        title = `Ringkasan Mingguan - ${format(weekStart, 'd MMM')} s/d ${format(weekEnd, 'd MMM yyyy', { locale: id })}`;
+        title = `Laporan Mingguan - ${format(weekStart, 'd MMM')} s/d ${format(weekEnd, 'd MMM yyyy', { locale: id })}`;
         dateFilter = (date) => isWithinInterval(date, { start: weekStart, end: weekEnd });
         break;
       case 'bulanan':
@@ -112,7 +113,7 @@ export default function LaporanPage() {
         dateForReport = selectedMonth;
         const monthStart = startOfMonth(dateForReport);
         const monthEnd = endOfMonth(dateForReport);
-        title = `Ringkasan Bulanan - ${format(dateForReport, 'MMMM yyyy', { locale: id })}`;
+        title = `Laporan Bulanan - ${format(dateForReport, 'MMMM yyyy', { locale: id })}`;
         dateFilter = (date) => isWithinInterval(date, { start: monthStart, end: monthEnd });
         break;
       default:
@@ -121,6 +122,7 @@ export default function LaporanPage() {
 
     setIsLoading(true);
     setSummary('');
+    setSummaryTitle(title);
 
     try {
       const kioskMap = kiosks.reduce((map, k) => { map[k.id] = k.name; return map }, {} as Record<string, string>);
@@ -131,7 +133,7 @@ export default function LaporanPage() {
       const dailyDoReleases = doReleases.filter(dr => dateFilter(new Date(dr.date)));
       const dailyDistributions = distributions.filter(d => dateFilter(new Date(d.date)));
 
-      let manualSummary = `*${title}*\n\n`;
+      let generatedSummary = ``;
 
       // Penebusan
       let totalRedemption = 0;
@@ -141,16 +143,18 @@ export default function LaporanPage() {
         const productName = productMap[r.productId] || 'Produk tidak diketahui';
         redemptionByProduct[productName] = (redemptionByProduct[productName] || 0) + r.quantity;
       });
-      manualSummary += `*Penebusan*\n`;
-      manualSummary += `Total: *${totalRedemption.toLocaleString('id-ID')} Ton*\n`;
+      generatedSummary += `<div><h4>Penebusan</h4>`;
+      generatedSummary += `<p>Total: <strong>${totalRedemption.toLocaleString('id-ID')} Ton</strong></p>`;
       if (Object.keys(redemptionByProduct).length > 0) {
+        generatedSummary += `<ul>`;
         for (const productName in redemptionByProduct) {
-          manualSummary += `- ${productName}: ${redemptionByProduct[productName].toLocaleString('id-ID')} Ton\n`;
+          generatedSummary += `<li>${productName}: ${redemptionByProduct[productName].toLocaleString('id-ID')} Ton</li>`;
         }
+        generatedSummary += `</ul>`;
       } else {
-        manualSummary += `- Tidak ada data.\n`;
+        generatedSummary += `<p class='text-muted-foreground'>- Tidak ada data.</p>`;
       }
-      manualSummary += `\n`;
+      generatedSummary += `</div>`;
 
       // Pengeluaran DO
       let totalDoRelease = 0;
@@ -161,16 +165,19 @@ export default function LaporanPage() {
         const productName = productId ? productMap[productId] : 'Produk tidak diketahui';
         doReleaseByProduct[productName] = (doReleaseByProduct[productName] || 0) + dr.quantity;
       });
-      manualSummary += `*Pengeluaran DO*\n`;
-      manualSummary += `Total: *${totalDoRelease.toLocaleString('id-ID')} Ton*\n`;
+      generatedSummary += `<div class='mt-4'><h4>Pengeluaran DO</h4>`;
+      generatedSummary += `<p>Total: <strong>${totalDoRelease.toLocaleString('id-ID')} Ton</strong></p>`;
       if (Object.keys(doReleaseByProduct).length > 0) {
+        generatedSummary += `<ul>`;
         for (const productName in doReleaseByProduct) {
-          manualSummary += `- ${productName}: ${doReleaseByProduct[productName].toLocaleString('id-ID')} Ton\n`;
+          generatedSummary += `<li>${productName}: ${doReleaseByProduct[productName].toLocaleString('id-ID')} Ton</li>`;
         }
+        generatedSummary += `</ul>`;
       } else {
-        manualSummary += `- Tidak ada data.\n`;
+        generatedSummary += `<p class='text-muted-foreground'>- Tidak ada data.</p>`;
       }
-      manualSummary += `\n`;
+      generatedSummary += `</div>`;
+
 
       // Penyaluran
       let totalDistribution = 0;
@@ -185,18 +192,21 @@ export default function LaporanPage() {
         }
         distByKiosk[kioskName].push({ product: productName, quantity: dist.quantity });
       });
-      manualSummary += `*Penyaluran Kios*\n`;
-      manualSummary += `Total: *${totalDistribution.toLocaleString('id-ID')} Ton*\n`;
+      generatedSummary += `<div class='mt-4'><h4>Penyaluran Kios</h4>`;
+      generatedSummary += `<p>Total: <strong>${totalDistribution.toLocaleString('id-ID')} Ton</strong></p>`;
       if (Object.keys(distByKiosk).length > 0) {
+        generatedSummary += `<ul>`;
         for (const kioskName in distByKiosk) {
           const totalPerKiosk = distByKiosk[kioskName].reduce((sum, item) => sum + item.quantity, 0);
-          manualSummary += `- *${kioskName}*: ${totalPerKiosk.toLocaleString('id-ID')} Ton\n`;
+          generatedSummary += `<li><strong>${kioskName}</strong>: ${totalPerKiosk.toLocaleString('id-ID')} Ton</li>`;
         }
+        generatedSummary += `</ul>`;
       } else {
-        manualSummary += `- Tidak ada data.\n`;
+        generatedSummary += `<p class='text-muted-foreground'>- Tidak ada data.</p>`;
       }
+      generatedSummary += `</div>`;
 
-      setSummary(manualSummary);
+      setSummary(generatedSummary);
 
     } catch (error) {
       console.error("Summary generation error:", error);
@@ -210,20 +220,22 @@ export default function LaporanPage() {
     }
   };
 
-  const sendToWhatsApp = () => {
-    if (!summary) {
-      toast({ title: 'Ringkasan Kosong', description: 'Buat ringkasan terlebih dahulu.', variant: 'destructive' });
-      return;
-    }
-    if (!phoneNumber) {
-      toast({ title: 'Nomor WhatsApp Kosong', description: 'Masukkan nomor WhatsApp tujuan.', variant: 'destructive' });
+  const exportToPdf = () => {
+    if (!summary || !reportContentRef.current) {
+      toast({ title: 'Laporan Kosong', description: 'Buat laporan terlebih dahulu.', variant: 'destructive' });
       return;
     }
 
-    const formattedPhoneNumber = phoneNumber.startsWith('0') ? `62${phoneNumber.substring(1)}` : phoneNumber;
-    const encodedSummary = encodeURIComponent(summary);
-    const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${encodedSummary}`;
-    window.open(whatsappUrl, '_blank');
+    const element = reportContentRef.current;
+    const opt = {
+      margin:       1,
+      filename:     `${summaryTitle.replace(/ /g, '_')}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    html2pdf().from(element).set(opt).save();
   };
 
   const renderCalendar = (
@@ -255,7 +267,7 @@ export default function LaporanPage() {
         <Skeleton className="h-[298px] w-[320px] rounded-md border" />
       )}
       <Button onClick={() => generateSummary(reportType)} disabled={isLoading || !date || !mounted} className="w-full">
-        {isLoading ? 'Membuat Ringkasan...' : `Buat Ringkasan ${reportType.charAt(0).toUpperCase() + reportType.slice(1)}`}
+        {isLoading ? 'Membuat Laporan...' : `Buat Laporan ${reportType.charAt(0).toUpperCase() + reportType.slice(1)}`}
       </Button>
     </div>
   );
@@ -267,9 +279,9 @@ export default function LaporanPage() {
       </h1>
       <Card>
         <CardHeader>
-          <CardTitle>Buat Ringkasan Laporan</CardTitle>
+          <CardTitle>Buat Laporan</CardTitle>
           <CardDescription>
-            Pilih jenis laporan dan tanggal untuk membuat ringkasan aktivitas yang siap dikirim ke WhatsApp.
+            Pilih jenis laporan dan tanggal untuk membuat ringkasan aktivitas yang siap diekspor ke PDF.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -297,27 +309,22 @@ export default function LaporanPage() {
               </div>
               <div className="flex flex-col gap-4">
                 <div className="grid w-full gap-1.5">
-                  <Label htmlFor="summary">Ringkasan Laporan</Label>
-                  <Textarea
-                    id="summary"
-                    placeholder="Ringkasan laporan akan muncul di sini..."
-                    value={summary}
-                    readOnly
-                    rows={15}
-                  />
+                  <Label htmlFor="summary">Pratinjau Laporan</Label>
+                   <div ref={reportContentRef} className="border rounded-md p-4 min-h-[300px] prose prose-sm max-w-none">
+                     {summary ? (
+                       <>
+                         <h3 className='font-bold text-lg'>{summaryTitle}</h3>
+                         <div dangerouslySetInnerHTML={{ __html: summary }} />
+                       </>
+                     ) : (
+                       <div className="flex items-center justify-center h-full text-muted-foreground">
+                         Laporan akan muncul di sini...
+                       </div>
+                     )}
+                   </div>
                 </div>
-                <div className="grid w-full gap-1.5">
-                  <Label htmlFor="whatsapp-number">Nomor WhatsApp Tujuan</Label>
-                  <Input
-                    id="whatsapp-number"
-                    type="tel"
-                    placeholder="cth. 081234567890"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                  />
-                </div>
-                <Button onClick={sendToWhatsApp} disabled={!summary || !phoneNumber}>
-                  <MessageCircle className="mr-2 h-4 w-4" /> Kirim via WhatsApp
+                <Button onClick={exportToPdf} disabled={!summary}>
+                  <Download className="mr-2 h-4 w-4" /> Ekspor ke PDF
                 </Button>
               </div>
             </div>
