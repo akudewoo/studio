@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, Redemption, DORelease } from '@/lib/types';
 import { initialProducts, initialRedemptions, initialDOReleases } from '@/lib/data';
@@ -42,6 +43,7 @@ export default function ProdukPage() {
   const [doReleases] = useState<DORelease[]>(initialDOReleases);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -52,20 +54,10 @@ export default function ProdukPage() {
       sellPrice: 0,
     },
   });
-  
+
   const stockByProduct = useMemo(() => {
     const stock: Record<string, number> = {};
 
-    // Calculate total redeemed per DO
-    const redeemedQtyByDO: Record<string, number> = {};
-    redemptions.forEach(redemption => {
-      if (!redeemedQtyByDO[redemption.doNumber]) {
-        redeemedQtyByDO[redemption.doNumber] = 0;
-      }
-      redeemedQtyByDO[redemption.doNumber] += redemption.quantity;
-    });
-    
-    // Calculate total released per DO
     const releasedQtyByDO: Record<string, number> = {};
     doReleases.forEach(release => {
       if (!releasedQtyByDO[release.doNumber]) {
@@ -74,7 +66,6 @@ export default function ProdukPage() {
       releasedQtyByDO[release.doNumber] += release.quantity;
     });
 
-    // Calculate stock per product
     products.forEach(p => {
         stock[p.id] = 0;
     });
@@ -141,6 +132,30 @@ export default function ProdukPage() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(products.map(p => p.id));
+    } else {
+      setSelectedProducts([]);
+    }
+  };
+
+  const handleSelectProduct = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedProducts([...selectedProducts, id]);
+    } else {
+      setSelectedProducts(selectedProducts.filter(pid => pid !== id));
+    }
+  };
+  
+  const handleDeleteSelected = () => {
+    setProducts(products.filter(p => !selectedProducts.includes(p.id)));
+    setSelectedProducts([]);
+    toast({
+      title: 'Sukses',
+      description: `${selectedProducts.length} produk berhasil dihapus.`,
+    });
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -149,10 +164,17 @@ export default function ProdukPage() {
           Daftar Produk
         </h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" onClick={() => handleDialogOpen(null)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Tambah Produk
-          </Button>
+          {selectedProducts.length > 0 ? (
+            <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Hapus ({selectedProducts.length})
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => handleDialogOpen(null)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Tambah Produk
+            </Button>
+          )}
         </div>
       </div>
       <Card>
@@ -160,6 +182,13 @@ export default function ProdukPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                   <Checkbox
+                    checked={selectedProducts.length > 0 && selectedProducts.length === products.length}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Pilih semua"
+                  />
+                </TableHead>
                 <TableHead>Nama Produk</TableHead>
                 <TableHead className="text-right">Harga Beli</TableHead>
                 <TableHead className="text-right">Harga Jual</TableHead>
@@ -169,7 +198,14 @@ export default function ProdukPage() {
             </TableHeader>
             <TableBody>
               {products.map((product) => (
-                <TableRow key={product.id}>
+                <TableRow key={product.id} data-state={selectedProducts.includes(product.id) && "selected"}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedProducts.includes(product.id)}
+                      onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                      aria-label={`Pilih ${product.name}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell className="text-right">
                     {formatCurrency(product.purchasePrice)}
