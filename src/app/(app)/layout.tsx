@@ -26,10 +26,12 @@ import {
   Warehouse,
   Settings,
   FileText,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 
 const navItems = [
+  { href: '/dashboard', label: 'Dasbor', icon: LayoutDashboard },
   { href: '/produk', label: 'Daftar Produk', icon: Package },
   { href: '/kios', label: 'Data Kios', icon: Store },
   { href: '/penebusan', label: 'Penebusan', icon: ShoppingCart },
