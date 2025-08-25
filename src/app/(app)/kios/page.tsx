@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,8 +29,8 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import type { Kiosk, KioskDistribution, Payment, Product, Redemption } from '@/lib/types';
-import { getKiosks, addKiosk, updateKiosk, deleteKiosk, deleteMultipleKiosks } from '@/services/kioskService';
+import type { Kiosk, KioskDistribution, Payment, Product, Redemption, KioskInput } from '@/lib/types';
+import { getKiosks, addKiosk, updateKiosk, deleteKiosk, deleteMultipleKiosks, addMultipleKiosks } from '@/services/kioskService';
 import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getPayments } from '@/services/paymentService';
 import { getProducts } from '@/services/productService';
@@ -55,6 +56,7 @@ export default function KiosPage() {
   const [editingKiosk, setEditingKiosk] = useState<Kiosk | null>(null);
   const [selectedKiosks, setSelectedKiosks] = useState<string[]>([]);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -212,6 +214,88 @@ export default function KiosPage() {
       setSelectedKiosks(selectedKiosks.filter(kid => kid !== id));
     }
   };
+  
+  const handleExport = () => {
+    const dataToExport = kiosks.map(k => ({
+        'Nama Kios': k.name,
+        'Penanggung Jawab': k.penanggungJawab,
+        'Alamat': k.address,
+        'Desa': k.desa,
+        'Kecamatan': k.kecamatan,
+        'No. Telepon': k.phone,
+        'Tagihan Total': totalBills[k.id] || 0
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Kios");
+    XLSX.writeFile(workbook, "DataKios.xlsx");
+     toast({
+        title: 'Sukses',
+        description: 'Data kios berhasil diekspor.',
+      });
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+            const newKiosks: KioskInput[] = [];
+            for (const item of json) {
+                const kioskData = {
+                    name: item['Nama Kios'],
+                    address: item['Alamat'],
+                    phone: item['No. Telepon'],
+                    desa: item['Desa'],
+                    kecamatan: item['Kecamatan'],
+                    penanggungJawab: item['Penanggung Jawab'],
+                };
+                
+                const parsed = kioskSchema.safeParse(kioskData);
+                if (parsed.success) {
+                    newKiosks.push(parsed.data);
+                } else {
+                    console.warn('Invalid item skipped:', parsed.error);
+                }
+            }
+
+            if (newKiosks.length > 0) {
+                const addedKiosks = await addMultipleKiosks(newKiosks);
+                setKiosks(prev => [...prev, ...addedKiosks]);
+                toast({
+                    title: 'Sukses',
+                    description: `${addedKiosks.length} kios berhasil diimpor.`,
+                });
+            } else {
+                 toast({
+                    title: 'Tidak Ada Data',
+                    description: 'Tidak ada data kios yang valid untuk diimpor.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Gagal mengimpor file. Pastikan format file benar.',
+                variant: 'destructive',
+            });
+        } finally {
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -220,6 +304,21 @@ export default function KiosPage() {
           Data Kios
         </h1>
         <div className="ml-auto flex items-center gap-2">
+           <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept=".xlsx, .xls, .csv"
+            onChange={handleImport}
+          />
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" />
+              Impor
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Ekspor
+          </Button>
            {selectedKiosks.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

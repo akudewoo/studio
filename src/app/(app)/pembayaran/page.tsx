@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,8 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import type { Payment, Kiosk, KioskDistribution, Product, Redemption } from '@/lib/types';
-import { getPayments, addPayment, updatePayment, deletePayment, deleteMultiplePayments } from '@/services/paymentService';
+import type { Payment, Kiosk, KioskDistribution, Product, Redemption, PaymentInput } from '@/lib/types';
+import { getPayments, addPayment, updatePayment, deletePayment, deleteMultiplePayments, addMultiplePayments } from '@/services/paymentService';
 import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
@@ -92,6 +92,7 @@ export default function PembayaranPage() {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -227,12 +228,118 @@ export default function PembayaranPage() {
       setSelectedPayments(selectedPayments.filter(pid => pid !== id));
     }
   };
+  
+  const handleExport = () => {
+    const dataToExport = payments.map(p => ({
+        'Tanggal': format(new Date(p.date), 'dd/MM/yyyy'),
+        'NO DO': p.doNumber,
+        'Nama Kios': getKioskName(p.kioskId),
+        'Total Bayar': p.amount,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pembayaran");
+    XLSX.writeFile(workbook, "DataPembayaran.xlsx");
+     toast({
+        title: 'Sukses',
+        description: 'Data pembayaran berhasil diekspor.',
+      });
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+            const kioskNameToIdMap = kiosks.reduce((map, k) => {
+              map[k.name] = k.id;
+              return map;
+            }, {} as Record<string, string>);
+
+            const newPayments: PaymentInput[] = [];
+            for (const item of json) {
+                const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
+                const kioskId = kioskNameToIdMap[item['Nama Kios']];
+                if (!kioskId) {
+                  console.warn(`Kiosk not found for: ${item['Nama Kios']}`);
+                  continue;
+                }
+
+                const paymentData = {
+                    date: excelDate,
+                    doNumber: item['NO DO'],
+                    kioskId: kioskId,
+                    amount: item['Total Bayar'],
+                };
+                
+                const parsed = paymentSchema.safeParse(paymentData);
+                if (parsed.success) {
+                    newPayments.push({
+                      ...parsed.data,
+                      date: parsed.data.date.toISOString(),
+                    });
+                } else {
+                    console.warn('Invalid item skipped:', parsed.error);
+                }
+            }
+
+            if (newPayments.length > 0) {
+                const addedPayments = await addMultiplePayments(newPayments);
+                setPayments(prev => [...prev, ...addedPayments]);
+                toast({
+                    title: 'Sukses',
+                    description: `${addedPayments.length} pembayaran berhasil diimpor.`,
+                });
+            } else {
+                 toast({
+                    title: 'Tidak Ada Data',
+                    description: 'Tidak ada data yang valid untuk diimpor.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Gagal mengimpor file. Pastikan format file, NO DO dan nama kios benar.',
+                variant: 'destructive',
+            });
+        } finally {
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pembayaran</h1>
         <div className="ml-auto flex items-center gap-2">
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleImport}
+            />
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Impor
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Ekspor
+            </Button>
           {selectedPayments.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

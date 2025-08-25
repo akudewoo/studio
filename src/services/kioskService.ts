@@ -9,6 +9,18 @@ export async function addKiosk(kiosk: KioskInput): Promise<Kiosk> {
     return { id: docRef.id, ...kiosk };
 }
 
+export async function addMultipleKiosks(kiosks: KioskInput[]): Promise<Kiosk[]> {
+    const batch = writeBatch(db);
+    const newKiosks: Kiosk[] = [];
+    kiosks.forEach(kiosk => {
+        const docRef = doc(kiosksCollection);
+        batch.set(docRef, kiosk);
+        newKiosks.push({ id: docRef.id, ...kiosk });
+    });
+    await batch.commit();
+    return newKiosks;
+}
+
 export async function getKiosks(): Promise<Kiosk[]> {
     const snapshot = await getDocs(kiosksCollection);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kiosk));

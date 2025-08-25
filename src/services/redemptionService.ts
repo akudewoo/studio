@@ -9,6 +9,19 @@ export async function addRedemption(redemption: RedemptionInput): Promise<Redemp
     return { id: docRef.id, ...redemption };
 }
 
+export async function addMultipleRedemptions(redemptions: RedemptionInput[]): Promise<Redemption[]> {
+    const batch = writeBatch(db);
+    const newRedemptions: Redemption[] = [];
+    redemptions.forEach(redemption => {
+        const docRef = doc(redemptionsCollection);
+        batch.set(docRef, redemption);
+        newRedemptions.push({ id: docRef.id, ...redemption });
+    });
+    await batch.commit();
+    return newRedemptions;
+}
+
+
 export async function getRedemptions(): Promise<Redemption[]> {
     const snapshot = await getDocs(redemptionsCollection);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Redemption));

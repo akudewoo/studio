@@ -9,6 +9,18 @@ export async function addKioskDistribution(distribution: KioskDistributionInput)
     return { id: docRef.id, ...distribution };
 }
 
+export async function addMultipleKioskDistributions(distributions: KioskDistributionInput[]): Promise<KioskDistribution[]> {
+    const batch = writeBatch(db);
+    const newDistributions: KioskDistribution[] = [];
+    distributions.forEach(distribution => {
+        const docRef = doc(kioskDistributionsCollection);
+        batch.set(docRef, distribution);
+        newDistributions.push({ id: docRef.id, ...distribution });
+    });
+    await batch.commit();
+    return newDistributions;
+}
+
 export async function getKioskDistributions(): Promise<KioskDistribution[]> {
     const snapshot = await getDocs(kioskDistributionsCollection);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KioskDistribution));

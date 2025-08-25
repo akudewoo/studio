@@ -9,6 +9,18 @@ export async function addPayment(payment: PaymentInput): Promise<Payment> {
     return { id: docRef.id, ...payment };
 }
 
+export async function addMultiplePayments(payments: PaymentInput[]): Promise<Payment[]> {
+    const batch = writeBatch(db);
+    const newPayments: Payment[] = [];
+    payments.forEach(payment => {
+        const docRef = doc(paymentsCollection);
+        batch.set(docRef, payment);
+        newPayments.push({ id: docRef.id, ...payment });
+    });
+    await batch.commit();
+    return newPayments;
+}
+
 export async function getPayments(): Promise<Payment[]> {
     const snapshot = await getDocs(paymentsCollection);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));

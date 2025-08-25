@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,8 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import type { KioskDistribution, Kiosk, Product, Redemption, Payment, DORelease } from '@/lib/types';
-import { getKioskDistributions, addKioskDistribution, updateKioskDistribution, deleteKioskDistribution, deleteMultipleKioskDistributions } from '@/services/kioskDistributionService';
+import type { KioskDistribution, Kiosk, Product, Redemption, Payment, DORelease, KioskDistributionInput } from '@/lib/types';
+import { getKioskDistributions, addKioskDistribution, updateKioskDistribution, deleteKioskDistribution, deleteMultipleKioskDistributions, addMultipleKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
@@ -60,6 +60,7 @@ export default function PenyaluranKiosPage() {
   const [editingDist, setEditingDist] = useState<KioskDistribution | null>(null);
   const [selectedDists, setSelectedDists] = useState<string[]>([]);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -178,12 +179,129 @@ export default function PenyaluranKiosPage() {
     }
   };
 
+  const handleExport = () => {
+    const dataToExport = distributions.map(dist => {
+        const { product } = getDetails(dist.doNumber);
+        const total = product ? dist.quantity * product.sellPrice : 0;
+        const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
+        const kurangBayar = total - dist.directPayment - totalTempo;
+        return {
+            'NO DO': dist.doNumber,
+            'Tanggal': format(new Date(dist.date), 'dd/MM/yyyy'),
+            'Nama Produk': product?.name || 'N/A',
+            'Nama Kios': getKioskName(dist.kioskId),
+            'QTY': dist.quantity,
+            'Total': total,
+            'Dibayar Langsung': dist.directPayment,
+            'Kurang Bayar': kurangBayar,
+        };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "PenyaluranKios");
+    XLSX.writeFile(workbook, "DataPenyaluranKios.xlsx");
+     toast({
+        title: 'Sukses',
+        description: 'Data penyaluran kios berhasil diekspor.',
+      });
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+             const kioskNameToIdMap = kiosks.reduce((map, k) => {
+              map[k.name] = k.id;
+              return map;
+            }, {} as Record<string, string>);
+
+            const newDistributions: KioskDistributionInput[] = [];
+            for (const item of json) {
+                const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
+                const kioskId = kioskNameToIdMap[item['Nama Kios']];
+                 if (!kioskId) {
+                  console.warn(`Kiosk not found for: ${item['Nama Kios']}`);
+                  continue;
+                }
+
+                const distData = {
+                    doNumber: item['NO DO'],
+                    date: excelDate,
+                    kioskId: kioskId,
+                    quantity: item['QTY'],
+                    directPayment: item['Dibayar Langsung'] || 0,
+                };
+                
+                const parsed = distributionSchema.safeParse(distData);
+                if (parsed.success) {
+                    newDistributions.push({
+                      ...parsed.data,
+                      date: parsed.data.date.toISOString(),
+                    });
+                } else {
+                    console.warn('Invalid item skipped:', parsed.error);
+                }
+            }
+
+            if (newDistributions.length > 0) {
+                const addedDists = await addMultipleKioskDistributions(newDistributions);
+                setDistributions(prev => [...prev, ...addedDists]);
+                toast({
+                    title: 'Sukses',
+                    description: `${addedDists.length} penyaluran berhasil diimpor.`,
+                });
+            } else {
+                 toast({
+                    title: 'Tidak Ada Data',
+                    description: 'Tidak ada data yang valid untuk diimpor.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Gagal mengimpor file. Pastikan format file, NO DO dan nama kios benar.',
+                variant: 'destructive',
+            });
+        } finally {
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penyaluran Kios</h1>
         <div className="ml-auto flex items-center gap-2">
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleImport}
+            />
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Impor
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Ekspor
+            </Button>
           {selectedDists.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

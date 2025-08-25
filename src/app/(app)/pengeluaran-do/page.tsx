@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,8 +32,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import type { DORelease, Redemption, Product } from '@/lib/types';
-import { getDOReleases, addDORelease, updateDORelease, deleteDORelease, deleteMultipleDOReleases } from '@/services/doReleaseService';
+import type { DORelease, Redemption, Product, DOReleaseInput } from '@/lib/types';
+import { getDOReleases, addDORelease, updateDORelease, deleteDORelease, deleteMultipleDOReleases, addMultipleDOReleases } from '@/services/doReleaseService';
 import { getRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
@@ -44,6 +44,11 @@ const doReleaseSchema = z.object({
   quantity: z.coerce.number().min(1, { message: 'QTY harus lebih dari 0' }),
 });
 
+// We add redemptionQuantity to the schema for import, but it's not part of the form
+const doReleaseImportSchema = doReleaseSchema.extend({
+    redemptionQuantity: z.number(),
+});
+
 export default function PengeluaranDOPage() {
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -52,6 +57,7 @@ export default function PengeluaranDOPage() {
   const [editingRelease, setEditingRelease] = useState<DORelease | null>(null);
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -208,12 +214,120 @@ export default function PengeluaranDOPage() {
     }
   };
 
+  const handleExport = () => {
+    const dataToExport = doReleases.map(r => {
+        const redemption = redemptionMap[r.doNumber];
+        const product = redemption ? productMap[redemption.productId] : null;
+        const sisa = sisaPenebusanByDO[r.doNumber] ?? 0;
+        return {
+            'NO DO': r.doNumber,
+            'Tanggal': format(new Date(r.date), 'dd/MM/yyyy'),
+            'Nama Produk': product?.name || 'N/A',
+            'QTY DO': r.quantity,
+            'QTY Penebusan': r.redemptionQuantity,
+            'Sisa Penebusan': sisa,
+        };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "PengeluaranDO");
+    XLSX.writeFile(workbook, "DataPengeluaranDO.xlsx");
+     toast({
+        title: 'Sukses',
+        description: 'Data pengeluaran DO berhasil diekspor.',
+      });
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+            const newReleases: DOReleaseInput[] = [];
+            for (const item of json) {
+                const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
+                const redemption = redemptionMap[item['NO DO']];
+                if (!redemption) {
+                  console.warn(`Redemption not found for DO: ${item['NO DO']}`);
+                  continue;
+                }
+
+                const releaseData = {
+                    doNumber: item['NO DO'],
+                    date: excelDate,
+                    quantity: item['QTY DO'],
+                    redemptionQuantity: redemption.quantity,
+                };
+                
+                const parsed = doReleaseImportSchema.safeParse(releaseData);
+                if (parsed.success) {
+                    newReleases.push({
+                      ...parsed.data,
+                      date: parsed.data.date.toISOString(),
+                    });
+                } else {
+                    console.warn('Invalid item skipped:', parsed.error);
+                }
+            }
+
+            if (newReleases.length > 0) {
+                const addedReleases = await addMultipleDOReleases(newReleases);
+                setDoReleases(prev => [...prev, ...addedReleases]);
+                toast({
+                    title: 'Sukses',
+                    description: `${addedReleases.length} pengeluaran DO berhasil diimpor.`,
+                });
+            } else {
+                 toast({
+                    title: 'Tidak Ada Data',
+                    description: 'Tidak ada data yang valid untuk diimpor.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Gagal mengimpor file. Pastikan format file dan NO DO benar.',
+                variant: 'destructive',
+            });
+        } finally {
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pengeluaran DO</h1>
         <div className="ml-auto flex items-center gap-2">
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleImport}
+            />
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Impor
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Ekspor
+            </Button>
           {selectedReleases.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,8 +33,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import type { Redemption, Product } from '@/lib/types';
-import { getRedemptions, addRedemption, updateRedemption, deleteRedemption, deleteMultipleRedemptions } from '@/services/redemptionService';
+import type { Redemption, Product, RedemptionInput } from '@/lib/types';
+import { getRedemptions, addRedemption, updateRedemption, deleteRedemption, deleteMultipleRedemptions, addMultipleRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +53,7 @@ export default function PenebusanPage() {
   const [editingRedemption, setEditingRedemption] = useState<Redemption | null>(null);
   const [selectedRedemptions, setSelectedRedemptions] = useState<string[]>([]);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -194,6 +195,105 @@ export default function PenebusanPage() {
       setSelectedRedemptions(selectedRedemptions.filter(rid => rid !== id));
     }
   };
+  
+  const handleExport = () => {
+    const dataToExport = redemptions.map(r => {
+        const product = productMap[r.productId];
+        const total = product ? product.purchasePrice * r.quantity : 0;
+        return {
+            'NO DO': r.doNumber,
+            'Supplier': r.supplier,
+            'Tanggal': format(new Date(r.date), 'dd/MM/yyyy'),
+            'Nama Produk': product?.name || 'N/A',
+            'QTY': r.quantity,
+            'Total': total
+        };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Penebusan");
+    XLSX.writeFile(workbook, "DataPenebusan.xlsx");
+     toast({
+        title: 'Sukses',
+        description: 'Data penebusan berhasil diekspor.',
+      });
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+            const productNameToIdMap = products.reduce((map, p) => {
+              map[p.name] = p.id;
+              return map;
+            }, {} as Record<string, string>);
+
+            const newRedemptions: RedemptionInput[] = [];
+            for (const item of json) {
+                const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
+                const productId = productNameToIdMap[item['Nama Produk']];
+                if (!productId) {
+                  console.warn(`Product not found for: ${item['Nama Produk']}`);
+                  continue;
+                }
+
+                const redemptionData = {
+                    doNumber: item['NO DO'],
+                    supplier: item['Supplier'],
+                    date: excelDate,
+                    productId: productId,
+                    quantity: item['QTY'],
+                };
+                
+                const parsed = redemptionSchema.safeParse(redemptionData);
+                if (parsed.success) {
+                    newRedemptions.push({
+                      ...parsed.data,
+                      date: parsed.data.date.toISOString(),
+                    });
+                } else {
+                    console.warn('Invalid item skipped:', parsed.error);
+                }
+            }
+
+            if (newRedemptions.length > 0) {
+                const addedRedemptions = await addMultipleRedemptions(newRedemptions);
+                setRedemptions(prev => [...prev, ...addedRedemptions]);
+                toast({
+                    title: 'Sukses',
+                    description: `${addedRedemptions.length} penebusan berhasil diimpor.`,
+                });
+            } else {
+                 toast({
+                    title: 'Tidak Ada Data',
+                    description: 'Tidak ada data penebusan yang valid untuk diimpor.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Gagal mengimpor file. Pastikan format file dan nama produk benar.',
+                variant: 'destructive',
+            });
+        } finally {
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
 
 
   return (
@@ -201,6 +301,21 @@ export default function PenebusanPage() {
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penebusan</h1>
         <div className="ml-auto flex items-center gap-2">
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleImport}
+            />
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Impor
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Ekspor
+            </Button>
           {selectedRedemptions.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

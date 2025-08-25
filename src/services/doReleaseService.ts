@@ -9,6 +9,18 @@ export async function addDORelease(doRelease: DOReleaseInput): Promise<DORelease
     return { id: docRef.id, ...doRelease };
 }
 
+export async function addMultipleDOReleases(doReleases: DOReleaseInput[]): Promise<DORelease[]> {
+    const batch = writeBatch(db);
+    const newReleases: DORelease[] = [];
+    doReleases.forEach(release => {
+        const docRef = doc(doReleasesCollection);
+        batch.set(docRef, release);
+        newReleases.push({ id: docRef.id, ...release });
+    });
+    await batch.commit();
+    return newReleases;
+}
+
 export async function getDOReleases(): Promise<DORelease[]> {
     const snapshot = await getDocs(doReleasesCollection);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DORelease));
