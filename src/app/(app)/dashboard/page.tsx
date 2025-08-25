@@ -323,7 +323,7 @@ export default function DashboardPage() {
           </Card>
            <Card>
             <CardHeader>
-              <CardTitle>Produk Terlaris</CardTitle>
+              <CardTitle>Produk Terjual</CardTitle>
               <CardDescription>Top 5 produk yang paling banyak disalurkan ke kios.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -356,5 +356,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
