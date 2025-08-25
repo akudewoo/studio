@@ -97,7 +97,7 @@ export default function PembayaranPage() {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [kioskFilter, setKioskFilter] = useState('all');
+  const [groupFilter, setGroupFilter] = useState<{key: 'kioskId' | 'none', value: string}>({key: 'none', value: 'all'});
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,8 +133,8 @@ export default function PembayaranPage() {
         );
     }
     
-    if (kioskFilter !== 'all') {
-        filterablePayments = filterablePayments.filter(p => p.kioskId === kioskFilter);
+    if (groupFilter.key !== 'none' && groupFilter.value !== 'all') {
+        filterablePayments = filterablePayments.filter(p => p[groupFilter.key] === groupFilter.value);
     }
     
     if (sortConfig !== null) {
@@ -161,7 +161,7 @@ export default function PembayaranPage() {
     }
 
     return filterablePayments;
-  }, [payments, searchQuery, kioskFilter, sortConfig, kiosks]);
+  }, [payments, searchQuery, groupFilter, sortConfig, kiosks]);
   
   const requestSort = (key: keyof Payment | 'kioskName') => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -170,6 +170,21 @@ export default function PembayaranPage() {
     }
     setSortConfig({ key, direction });
   };
+  
+  const groupingOptions: {key: 'kioskId', label: string}[] = [
+    { key: 'kioskId', label: 'Nama Kios' },
+  ];
+
+  const uniqueGroupValues = useMemo(() => {
+    if (groupFilter.key === 'none') return [];
+    if (groupFilter.key === 'kioskId') {
+      return [...new Set(payments.map(p => p.kioskId))].map(kioskId => ({
+        value: kioskId,
+        label: getKioskName(kioskId)
+      }));
+    }
+    return [];
+  }, [payments, groupFilter.key, kiosks]);
 
 
   const form = useForm<z.infer<typeof paymentSchema>>({
@@ -390,15 +405,26 @@ export default function PembayaranPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Select value={kioskFilter} onValueChange={setKioskFilter}>
+            <Select onValueChange={(key) => setGroupFilter({ key: key as 'kioskId' | 'none', value: 'all' })} value={groupFilter.key}>
                 <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter Kios" />
+                    <SelectValue placeholder="Kelompokkan Data" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">Semua Kios</SelectItem>
-                    {kiosks.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
+                    <SelectItem value="none">Tidak Dikelompokkan</SelectItem>
+                    {groupingOptions.map(opt => <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>)}
                 </SelectContent>
             </Select>
+            {groupFilter.key !== 'none' && (
+              <Select onValueChange={(value) => setGroupFilter(prev => ({ ...prev, value }))} value={groupFilter.value}>
+                  <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder={`Filter ${groupingOptions.find(o => o.key === groupFilter.key)?.label}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {uniqueGroupValues.map(val => <SelectItem key={val.value} value={val.value}>{val.label}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+            )}
         </div>
         <div className="flex items-center gap-2">
             <input
@@ -428,8 +454,9 @@ export default function PembayaranPage() {
       </div>
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-auto max-h-[calc(100vh-220px)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                  <TableHead className="w-[50px]">
                    <Checkbox
@@ -472,6 +499,7 @@ export default function PembayaranPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

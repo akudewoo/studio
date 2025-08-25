@@ -369,12 +369,12 @@ export default function ProdukPage() {
         <h1 className="font-headline text-lg font-semibold md:text-2xl">
           Daftar Produk
         </h1>
-        <div className="relative ml-auto flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Cari..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              className="w-full rounded-lg bg-background md:w-[200px] lg:w-[320px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -411,8 +411,9 @@ export default function ProdukPage() {
       </div>
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-auto max-h-[calc(100vh-220px)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
@@ -439,7 +440,7 @@ export default function ProdukPage() {
                      <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-center">
                   <Button variant="ghost" onClick={() => requestSort('stock')}>
                     Stok
                     <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -465,7 +466,7 @@ export default function ProdukPage() {
                   <TableCell className="text-right">
                     {formatCurrency(product.sellPrice)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-center">
                     {(stockByProduct[product.id] || 0).toLocaleString('id-ID')}
                   </TableCell>
                   <TableCell>
@@ -495,6 +496,7 @@ export default function ProdukPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

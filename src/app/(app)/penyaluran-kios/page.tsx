@@ -51,7 +51,7 @@ const distributionSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'kurangBayar';
+  key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'paymentTempo' | 'kurangBayar';
   direction: 'ascending' | 'descending';
 } | null;
 
@@ -66,7 +66,7 @@ export default function PenyaluranKiosPage() {
   const [editingDist, setEditingDist] = useState<KioskDistribution | null>(null);
   const [selectedDists, setSelectedDists] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [kioskFilter, setKioskFilter] = useState('all');
+  const [groupFilter, setGroupFilter] = useState<{key: 'kioskId' | 'none', value: string}>({key: 'none', value: 'all'});
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,8 +112,8 @@ export default function PenyaluranKiosPage() {
         });
     }
 
-    if (kioskFilter !== 'all') {
-        filterableDistributions = filterableDistributions.filter(d => d.kioskId === kioskFilter);
+    if (groupFilter.key !== 'none' && groupFilter.value !== 'all') {
+        filterableDistributions = filterableDistributions.filter(d => d[groupFilter.key] === groupFilter.value);
     }
     
     if (sortConfig !== null) {
@@ -123,6 +123,9 @@ export default function PenyaluranKiosPage() {
         
         const { product: productA } = getDetails(a.doNumber);
         const { product: productB } = getDetails(b.doNumber);
+        
+        const paymentTempoA = payments.filter(p => p.doNumber === a.doNumber && p.kioskId === a.kioskId).reduce((sum, p) => sum + p.amount, 0);
+        const paymentTempoB = payments.filter(p => p.doNumber === b.doNumber && p.kioskId === b.kioskId).reduce((sum, p) => sum + p.amount, 0);
 
         switch (sortConfig.key) {
             case 'productName':
@@ -137,14 +140,16 @@ export default function PenyaluranKiosPage() {
                 aValue = productA ? a.quantity * productA.sellPrice : 0;
                 bValue = productB ? b.quantity * productB.sellPrice : 0;
                 break;
+            case 'paymentTempo':
+                aValue = paymentTempoA;
+                bValue = paymentTempoB;
+                break;
             case 'kurangBayar':
                 const totalA = productA ? a.quantity * productA.sellPrice : 0;
-                const totalTempoA = payments.filter(p => p.doNumber === a.doNumber && p.kioskId === a.kioskId).reduce((sum, p) => sum + p.amount, 0);
-                aValue = totalA - a.directPayment - totalTempoA;
+                aValue = totalA - a.directPayment - paymentTempoA;
 
                 const totalB = productB ? b.quantity * productB.sellPrice : 0;
-                const totalTempoB = payments.filter(p => p.doNumber === b.doNumber && p.kioskId === b.kioskId).reduce((sum, p) => sum + p.amount, 0);
-                bValue = totalB - b.directPayment - totalTempoB;
+                bValue = totalB - b.directPayment - paymentTempoB;
                 break;
             default:
                 aValue = a[sortConfig.key as keyof KioskDistribution];
@@ -162,15 +167,30 @@ export default function PenyaluranKiosPage() {
     }
 
     return filterableDistributions;
-  }, [distributions, searchQuery, kioskFilter, sortConfig, kiosks, redemptions, products, payments]);
+  }, [distributions, searchQuery, groupFilter, sortConfig, kiosks, redemptions, products, payments]);
 
-  const requestSort = (key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'kurangBayar') => {
+  const requestSort = (key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'paymentTempo' | 'kurangBayar') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
   };
+  
+  const groupingOptions: {key: 'kioskId', label: string}[] = [
+    { key: 'kioskId', label: 'Nama Kios' },
+  ];
+
+  const uniqueGroupValues = useMemo(() => {
+    if (groupFilter.key === 'none') return [];
+    if (groupFilter.key === 'kioskId') {
+      return [...new Set(distributions.map(p => p.kioskId))].map(kioskId => ({
+        value: kioskId,
+        label: getKioskName(kioskId)
+      }));
+    }
+    return [];
+  }, [distributions, groupFilter.key, kiosks]);
 
   const form = useForm<z.infer<typeof distributionSchema>>({
     resolver: zodResolver(distributionSchema),
@@ -288,6 +308,7 @@ export default function PenyaluranKiosPage() {
             'QTY': dist.quantity,
             'Total': total,
             'Dibayar Langsung': dist.directPayment,
+            'Pembayaran Tempo': totalTempo,
             'Kurang Bayar': kurangBayar,
         };
     });
@@ -390,15 +411,26 @@ export default function PenyaluranKiosPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-             <Select value={kioskFilter} onValueChange={setKioskFilter}>
+             <Select onValueChange={(key) => setGroupFilter({ key: key as 'kioskId' | 'none', value: 'all' })} value={groupFilter.key}>
                 <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter Kios" />
+                    <SelectValue placeholder="Kelompokkan Data" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">Semua Kios</SelectItem>
-                    {kiosks.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
+                    <SelectItem value="none">Tidak Dikelompokkan</SelectItem>
+                    {groupingOptions.map(opt => <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>)}
                 </SelectContent>
             </Select>
+            {groupFilter.key !== 'none' && (
+              <Select onValueChange={(value) => setGroupFilter(prev => ({ ...prev, value }))} value={groupFilter.value}>
+                  <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder={`Filter ${groupingOptions.find(o => o.key === groupFilter.key)?.label}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {uniqueGroupValues.map(val => <SelectItem key={val.value} value={val.value}>{val.label}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+            )}
         </div>
         <div className="flex items-center gap-2">
             <input
@@ -428,8 +460,9 @@ export default function PenyaluranKiosPage() {
       </div>
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-auto max-h-[calc(100vh-220px)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
@@ -442,8 +475,10 @@ export default function PenyaluranKiosPage() {
                 <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('total')}>Total<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('directPayment')}>Dibayar Langsung<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('paymentTempo')}>Pembayaran Tempo<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('kurangBayar')}>Kurang Bayar<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -468,8 +503,10 @@ export default function PenyaluranKiosPage() {
                     <TableCell>{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'N/A'}</TableCell>
                     <TableCell>{getKioskName(dist.kioskId)}</TableCell>
-                    <TableCell className="text-right">{dist.quantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-center">{dist.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-right">{formatCurrency(total)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(dist.directPayment)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalTempo)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(kurangBayar)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -485,6 +522,7 @@ export default function PenyaluranKiosPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

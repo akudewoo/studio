@@ -58,7 +58,7 @@ export default function PenebusanPage() {
   const [editingRedemption, setEditingRedemption] = useState<Redemption | null>(null);
   const [selectedRedemptions, setSelectedRedemptions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('all');
+  const [groupFilter, setGroupFilter] = useState<{key: keyof Redemption | 'none', value: string}>({key: 'none', value: 'all'});
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,8 +97,8 @@ export default function PenebusanPage() {
         );
     }
     
-    if (supplierFilter !== 'all') {
-        filterableRedemptions = filterableRedemptions.filter(r => r.supplier === supplierFilter);
+    if (groupFilter.key !== 'none' && groupFilter.value !== 'all') {
+        filterableRedemptions = filterableRedemptions.filter(r => r[groupFilter.key] === groupFilter.value);
     }
 
     if (sortConfig !== null) {
@@ -130,7 +130,7 @@ export default function PenebusanPage() {
     }
 
     return filterableRedemptions;
-  }, [redemptions, searchQuery, supplierFilter, sortConfig, productMap]);
+  }, [redemptions, searchQuery, groupFilter, sortConfig, productMap]);
 
   const requestSort = (key: keyof Redemption | 'productName' | 'total') => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -140,9 +140,14 @@ export default function PenebusanPage() {
     setSortConfig({ key, direction });
   };
   
-  const uniqueSuppliers = useMemo(() => {
-    return [...new Set(redemptions.map(r => r.supplier))];
-  }, [redemptions]);
+  const groupingOptions: {key: keyof Redemption, label: string}[] = [
+    { key: 'supplier', label: 'Supplier' },
+  ];
+
+  const uniqueGroupValues = useMemo(() => {
+    if (groupFilter.key === 'none') return [];
+    return [...new Set(redemptions.map(r => r[groupFilter.key]))];
+  }, [redemptions, groupFilter.key]);
 
 
   const form = useForm<z.infer<typeof redemptionSchema>>({
@@ -376,15 +381,26 @@ export default function PenebusanPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+             <Select onValueChange={(key) => setGroupFilter({ key: key as keyof Redemption, value: 'all' })} value={groupFilter.key}>
                 <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter Supplier" />
+                    <SelectValue placeholder="Kelompokkan Data" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">Semua Supplier</SelectItem>
-                    {uniqueSuppliers.map(sup => <SelectItem key={sup} value={sup}>{sup}</SelectItem>)}
+                    <SelectItem value="none">Tidak Dikelompokkan</SelectItem>
+                    {groupingOptions.map(opt => <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>)}
                 </SelectContent>
             </Select>
+            {groupFilter.key !== 'none' && (
+              <Select onValueChange={(value) => setGroupFilter(prev => ({ ...prev, value }))} value={groupFilter.value}>
+                  <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder={`Filter ${groupingOptions.find(o => o.key === groupFilter.key)?.label}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Semua</SelectItem>
+                      {uniqueGroupValues.map(val => <SelectItem key={val} value={val}>{val}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+            )}
         </div>
         <div className="flex items-center gap-2">
             <input
@@ -417,8 +433,9 @@ export default function PenebusanPage() {
       </div>
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-auto max-h-[calc(100vh-220px)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
@@ -431,7 +448,7 @@ export default function PenebusanPage() {
                 <TableHead><Button variant="ghost" onClick={() => requestSort('supplier')}>Supplier <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('total')}>Total <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -453,7 +470,7 @@ export default function PenebusanPage() {
                     <TableCell>{redemption.supplier}</TableCell>
                     <TableCell>{format(new Date(redemption.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'Produk tidak ditemukan'}</TableCell>
-                    <TableCell className="text-right">{redemption.quantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-center">{redemption.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-right">{formatCurrency(total)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -477,6 +494,7 @@ export default function PenebusanPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

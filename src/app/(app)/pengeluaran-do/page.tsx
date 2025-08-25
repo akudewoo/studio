@@ -384,12 +384,12 @@ export default function PengeluaranDOPage() {
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pengeluaran DO</h1>
-        <div className="relative ml-auto flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Cari..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              className="w-full rounded-lg bg-background md:w-[200px] lg:w-[320px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -425,8 +425,9 @@ export default function PengeluaranDOPage() {
       </div>
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-auto max-h-[calc(100vh-220px)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
@@ -438,9 +439,9 @@ export default function PengeluaranDOPage() {
                 <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('redemptionQuantity')}>QTY Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('sisaPenebusan')}>Sisa Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('redemptionQuantity')}>QTY Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('sisaPenebusan')}>Sisa Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -462,9 +463,9 @@ export default function PengeluaranDOPage() {
                     <TableCell className="font-medium">{release.doNumber}</TableCell>
                     <TableCell>{format(new Date(release.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'N/A'}</TableCell>
-                    <TableCell className="text-right">{release.quantity.toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="text-right">{release.redemptionQuantity.toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="text-right">{sisa.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-center">{release.quantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-center">{release.redemptionQuantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-center">{sisa.toLocaleString('id-ID')}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -479,6 +480,7 @@ export default function PengeluaranDOPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
