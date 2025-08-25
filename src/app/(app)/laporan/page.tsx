@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { format, isWithinInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
-import html2pdf from 'html2pdf.js';
+
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -220,11 +220,14 @@ export default function LaporanPage() {
     }
   };
 
-  const exportToPdf = () => {
+  const exportToPdf = async () => {
     if (!summary || !reportContentRef.current) {
       toast({ title: 'Laporan Kosong', description: 'Buat laporan terlebih dahulu.', variant: 'destructive' });
       return;
     }
+    
+    // Dynamically import html2pdf.js only on the client-side
+    const html2pdf = (await import('html2pdf.js')).default;
 
     const element = reportContentRef.current;
     const opt = {
