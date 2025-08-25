@@ -505,28 +505,28 @@ export default function PenyaluranKiosPage() {
       </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="text-xs">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                <TableHead className="w-[50px]">
+                <TableHead className="w-[40px] px-2">
                    <Checkbox
                     checked={sortedAndFilteredDistributions.length > 0 && selectedDists.length === sortedAndFilteredDistributions.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('total')}>Total<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('directPayment')}>Dibayar Langsung<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('paymentTempo')}>Pembayaran Tempo<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('kurangBayar')}>Kurang Bayar<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead>Keterangan</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('total')}>Total<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('directPayment')}>Dibayar Langsung<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('paymentTempo')}>Pembayaran Tempo<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kurangBayar')}>Kurang Bayar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2">Keterangan</TableHead>
+                <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -543,28 +543,28 @@ export default function PenyaluranKiosPage() {
                     data-state={selectedDists.includes(dist.id) && "selected"}
                     className={cn({ 'bg-destructive/10 hover:bg-destructive/20 data-[state=selected]:bg-destructive/20': isUnpaid })}
                   >
-                    <TableCell>
+                    <TableCell className="px-2">
                       <Checkbox
                         checked={selectedDists.includes(dist.id)}
                         onCheckedChange={(checked) => handleSelectDist(dist.id, !!checked)}
                         aria-label={`Pilih ${dist.doNumber}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{dist.doNumber}</TableCell>
-                    <TableCell>{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell>{product?.name || 'N/A'}</TableCell>
-                    <TableCell>{getKioskName(dist.kioskId)}</TableCell>
-                    <TableCell className="text-center">{dist.quantity.toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(total)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dist.directPayment)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totalTempo)}</TableCell>
-                    <TableCell className={cn("text-right", { "text-destructive font-semibold": isUnpaid })}>{formatCurrency(kurangBayar)}</TableCell>
-                    <TableCell className={cn({ "text-destructive font-semibold": isUnpaid })}>
+                    <TableCell className="font-medium px-2">{dist.doNumber}</TableCell>
+                    <TableCell className="px-2">{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="px-2">{product?.name || 'N/A'}</TableCell>
+                    <TableCell className="px-2">{getKioskName(dist.kioskId)}</TableCell>
+                    <TableCell className="text-center px-2">{dist.quantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-right px-2">{formatCurrency(total)}</TableCell>
+                    <TableCell className="text-right px-2">{formatCurrency(dist.directPayment)}</TableCell>
+                    <TableCell className="text-right px-2">{formatCurrency(totalTempo)}</TableCell>
+                    <TableCell className={cn("text-right px-2", { "text-destructive font-semibold": isUnpaid })}>{formatCurrency(kurangBayar)}</TableCell>
+                    <TableCell className={cn("px-2", { "text-destructive font-semibold": isUnpaid })}>
                         {isUnpaid ? 'Belum Lunas' : 'Lunas'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-2">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleDialogOpen(dist)}><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(dist.id)}><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>

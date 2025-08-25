@@ -463,24 +463,24 @@ export default function PenebusanPage() {
       </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="text-xs">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                <TableHead className="w-[50px]">
+                <TableHead className="w-[40px] px-2">
                    <Checkbox
                     checked={sortedAndFilteredRedemptions.length > 0 && selectedRedemptions.length === sortedAndFilteredRedemptions.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('supplier')}>Supplier <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('total')}>Total <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('supplier')}>Supplier <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('total')}>Total <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -489,23 +489,23 @@ export default function PenebusanPage() {
                 const total = product ? product.purchasePrice * redemption.quantity : 0;
                 return (
                   <TableRow key={redemption.id} data-state={selectedRedemptions.includes(redemption.id) && "selected"}>
-                    <TableCell>
+                    <TableCell className="px-2">
                       <Checkbox
                         checked={selectedRedemptions.includes(redemption.id)}
                         onCheckedChange={(checked) => handleSelectRedemption(redemption.id, !!checked)}
                         aria-label={`Pilih ${redemption.doNumber}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{redemption.doNumber}</TableCell>
-                    <TableCell>{redemption.supplier}</TableCell>
-                    <TableCell>{format(new Date(redemption.date), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell>{product?.name || 'Produk tidak ditemukan'}</TableCell>
-                    <TableCell className="text-center">{redemption.quantity.toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(total)}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium px-2">{redemption.doNumber}</TableCell>
+                    <TableCell className="px-2">{redemption.supplier}</TableCell>
+                    <TableCell className="px-2">{format(new Date(redemption.date), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="px-2">{product?.name || 'Produk tidak ditemukan'}</TableCell>
+                    <TableCell className="text-center px-2">{redemption.quantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-right px-2">{formatCurrency(total)}</TableCell>
+                    <TableCell className="px-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-6 w-6 p-0">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>

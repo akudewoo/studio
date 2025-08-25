@@ -451,68 +451,68 @@ export default function ProdukPage() {
       </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="text-xs">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                <TableHead className="w-[50px]">
+                <TableHead className="w-[40px] px-2">
                    <Checkbox
                     checked={sortedAndFilteredProducts.length > 0 && selectedProducts.length === sortedAndFilteredProducts.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => requestSort('name')}>
+                <TableHead className="px-2">
+                  <Button variant="ghost" onClick={() => requestSort('name')} className="text-xs px-2">
                     Nama Produk
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-2 h-3 w-3" />
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
-                  <Button variant="ghost" onClick={() => requestSort('purchasePrice')}>
+                <TableHead className="text-right px-2">
+                  <Button variant="ghost" onClick={() => requestSort('purchasePrice')} className="text-xs px-2">
                     Harga Beli
-                     <ArrowUpDown className="ml-2 h-4 w-4" />
+                     <ArrowUpDown className="ml-2 h-3 w-3" />
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
-                  <Button variant="ghost" onClick={() => requestSort('sellPrice')}>
+                <TableHead className="text-right px-2">
+                  <Button variant="ghost" onClick={() => requestSort('sellPrice')} className="text-xs px-2">
                     Harga Jual
-                     <ArrowUpDown className="ml-2 h-4 w-4" />
+                     <ArrowUpDown className="ml-2 h-3 w-3" />
                   </Button>
                 </TableHead>
-                <TableHead className="text-center">
-                  <Button variant="ghost" onClick={() => requestSort('stock')}>
+                <TableHead className="text-center px-2">
+                  <Button variant="ghost" onClick={() => requestSort('stock')} className="text-xs px-2">
                     Stok
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-2 h-3 w-3" />
                   </Button>
                 </TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedAndFilteredProducts.map((product) => (
                 <TableRow key={product.id} data-state={selectedProducts.includes(product.id) && "selected"}>
-                  <TableCell>
+                  <TableCell className="px-2">
                     <Checkbox
                       checked={selectedProducts.includes(product.id)}
                       onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
                       aria-label={`Pilih ${product.name}`}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="font-medium px-2">{product.name}</TableCell>
+                  <TableCell className="text-right px-2">
                     {formatCurrency(product.purchasePrice)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right px-2">
                     {formatCurrency(product.sellPrice)}
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center px-2">
                     {(stockByProduct[product.id] || 0).toLocaleString('id-ID')}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button variant="ghost" className="h-6 w-6 p-0">
                           <span className="sr-only">Buka menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>

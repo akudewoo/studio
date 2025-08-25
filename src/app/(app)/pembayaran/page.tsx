@@ -471,41 +471,41 @@ export default function PembayaranPage() {
       </Card>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="text-xs">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                 <TableHead className="w-[50px]">
+                 <TableHead className="w-[40px] px-2">
                    <Checkbox
                     checked={sortedAndFilteredPayments.length > 0 && selectedPayments.length === sortedAndFilteredPayments.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('amount')}>Total Bayar<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('amount')}>Total Bayar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedAndFilteredPayments.map((payment) => (
                 <TableRow key={payment.id} data-state={selectedPayments.includes(payment.id) && "selected"}>
-                  <TableCell>
+                  <TableCell className="px-2">
                     <Checkbox
                       checked={selectedPayments.includes(payment.id)}
                       onCheckedChange={(checked) => handleSelectPayment(payment.id, !!checked)}
                       aria-label={`Pilih pembayaran ${payment.id}`}
                     />
                   </TableCell>
-                  <TableCell>{format(new Date(payment.date), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell className="font-medium">{payment.doNumber}</TableCell>
-                  <TableCell>{getKioskName(payment.kioskId)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
-                  <TableCell>
+                  <TableCell className="px-2">{format(new Date(payment.date), 'dd/MM/yyyy')}</TableCell>
+                  <TableCell className="font-medium px-2">{payment.doNumber}</TableCell>
+                  <TableCell className="px-2">{getKioskName(payment.kioskId)}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(payment.amount)}</TableCell>
+                  <TableCell className="px-2">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleDialogOpen(payment)}><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(payment.id)}><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>

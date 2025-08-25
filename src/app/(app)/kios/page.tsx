@@ -465,25 +465,25 @@ export default function KiosPage() {
       </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="text-xs">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                 <TableHead className="w-[50px]">
+                 <TableHead className="w-[40px] px-2">
                    <Checkbox
                     checked={sortedAndFilteredKiosks.length > 0 && selectedKiosks.length === sortedAndFilteredKiosks.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('name')}>Nama Kios <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('penanggungJawab')}>Penanggung Jawab <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('address')}>Alamat <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('desa')}>Desa <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('kecamatan')}>Kecamatan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('phone')}>No. Telepon <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('totalBills')}>Tagihan Total <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('name')}>Nama Kios <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('penanggungJawab')}>Penanggung Jawab <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('address')}>Alamat <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('desa')}>Desa <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kecamatan')}>Kecamatan <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('phone')}>No. Telepon <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('totalBills')}>Tagihan Total <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -496,24 +496,24 @@ export default function KiosPage() {
                   data-state={selectedKiosks.includes(kiosk.id) && "selected"}
                   className={cn({ 'bg-destructive/10 hover:bg-destructive/20 text-destructive': hasBill })}
                 >
-                   <TableCell>
+                   <TableCell className="px-2">
                     <Checkbox
                       checked={selectedKiosks.includes(kiosk.id)}
                       onCheckedChange={(checked) => handleSelectKiosk(kiosk.id, !!checked)}
                       aria-label={`Pilih ${kiosk.name}`}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{kiosk.name}</TableCell>
-                  <TableCell>{kiosk.penanggungJawab}</TableCell>
-                  <TableCell>{kiosk.address}</TableCell>
-                  <TableCell>{kiosk.desa}</TableCell>
-                  <TableCell>{kiosk.kecamatan}</TableCell>
-                  <TableCell>{kiosk.phone}</TableCell>
-                  <TableCell className={cn("text-right", { "font-semibold": hasBill })}>{formatCurrency(bill)}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-medium px-2">{kiosk.name}</TableCell>
+                  <TableCell className="px-2">{kiosk.penanggungJawab}</TableCell>
+                  <TableCell className="px-2">{kiosk.address}</TableCell>
+                  <TableCell className="px-2">{kiosk.desa}</TableCell>
+                  <TableCell className="px-2">{kiosk.kecamatan}</TableCell>
+                  <TableCell className="px-2">{kiosk.phone}</TableCell>
+                  <TableCell className={cn("text-right px-2", { "font-semibold": hasBill })}>{formatCurrency(bill)}</TableCell>
+                  <TableCell className="px-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button variant="ghost" className="h-6 w-6 p-0">
                           <span className="sr-only">Buka menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>

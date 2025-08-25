@@ -441,24 +441,24 @@ export default function PengeluaranDOPage() {
       </Card>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-280px)]">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="text-xs">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                <TableHead className="w-[50px]">
+                <TableHead className="w-[40px] px-2">
                    <Checkbox
                     checked={sortedAndFilteredDoReleases.length > 0 && selectedReleases.length === sortedAndFilteredDoReleases.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('quantity')}>QTY DO <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('redemptionQuantity')}>QTY Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="text-center"><Button variant="ghost" onClick={() => requestSort('sisaPenebusan')}>Sisa Penebusan <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('redemptionQuantity')}>QTY Penebusan <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('sisaPenebusan')}>Sisa Penebusan <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -469,22 +469,22 @@ export default function PengeluaranDOPage() {
 
                 return (
                   <TableRow key={release.id} data-state={selectedReleases.includes(release.id) && "selected"}>
-                    <TableCell>
+                    <TableCell className="px-2">
                       <Checkbox
                         checked={selectedReleases.includes(release.id)}
                         onCheckedChange={(checked) => handleSelectRelease(release.id, !!checked)}
                         aria-label={`Pilih ${release.doNumber}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{release.doNumber}</TableCell>
-                    <TableCell>{format(new Date(release.date), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell>{product?.name || 'N/A'}</TableCell>
-                    <TableCell className="text-center">{release.quantity.toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="text-center">{release.redemptionQuantity.toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="text-center">{sisa.toLocaleString('id-ID')}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium px-2">{release.doNumber}</TableCell>
+                    <TableCell className="px-2">{format(new Date(release.date), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="px-2">{product?.name || 'N/A'}</TableCell>
+                    <TableCell className="text-center px-2">{release.quantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-center px-2">{release.redemptionQuantity.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-center px-2">{sisa.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="px-2">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleDialogOpen(release)}><Edit className="mr-2 h-4 w-4" /> Ubah</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(release.id)}><Trash2 className="mr-2 h-4 w-4" /> Hapus</DropdownMenuItem>
