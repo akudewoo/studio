@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -27,37 +27,78 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import type { Kiosk } from '@/lib/types';
+import type { Kiosk, KioskDistribution, Payment, Product, Redemption } from '@/lib/types';
 import { getKiosks, addKiosk, updateKiosk, deleteKiosk } from '@/services/kioskService';
+import { getKioskDistributions } from '@/services/kioskDistributionService';
+import { getPayments } from '@/services/paymentService';
+import { getProducts } from '@/services/productService';
+import { getRedemptions } from '@/services/redemptionService';
+
 
 const kioskSchema = z.object({
   name: z.string().min(1, { message: 'Nama kios harus diisi' }),
   address: z.string().min(1, { message: 'Alamat harus diisi' }),
   phone: z.string().min(1, { message: 'No. Telepon harus diisi' }),
+  desa: z.string().min(1, { message: 'Desa harus diisi' }),
+  kecamatan: z.string().min(1, { message: 'Kecamatan harus diisi' }),
+  penanggungJawab: z.string().min(1, { message: 'Penanggung Jawab harus diisi' }),
 });
 
 export default function KiosPage() {
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
+  const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingKiosk, setEditingKiosk] = useState<Kiosk | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    async function loadKiosks() {
+    async function loadData() {
       try {
-        const fetchedKiosks = await getKiosks();
-        setKiosks(fetchedKiosks);
+        setKiosks(await getKiosks());
+        setDistributions(await getKioskDistributions());
+        setPayments(await getPayments());
+        setProducts(await getProducts());
+        setRedemptions(await getRedemptions());
       } catch (error) {
         console.error("Firebase Error: ", error);
         toast({
-          title: 'Gagal Memuat Kios',
-          description: 'Gagal memuat data kios dari database.',
+          title: 'Gagal Memuat Data',
+          description: 'Gagal memuat data dari database.',
           variant: 'destructive',
         });
       }
     }
-    loadKiosks();
+    loadData();
   }, [toast]);
+  
+  const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+
+  const totalBills = useMemo(() => {
+    const bills: Record<string, number> = {};
+
+    kiosks.forEach(kiosk => {
+      bills[kiosk.id] = 0;
+    });
+
+    distributions.forEach(dist => {
+      const redemption = redemptions.find(r => r.doNumber === dist.doNumber);
+      const product = redemption ? products.find(p => p.id === redemption.productId) : undefined;
+      if (product) {
+        const total = dist.quantity * product.sellPrice;
+        const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
+        const kurangBayar = total - dist.directPayment - totalTempo;
+        if (bills[dist.kioskId] !== undefined) {
+          bills[dist.kioskId] += kurangBayar;
+        }
+      }
+    });
+
+    return bills;
+  }, [kiosks, distributions, payments, products, redemptions]);
+
 
   const form = useForm<z.infer<typeof kioskSchema>>({
     resolver: zodResolver(kioskSchema),
@@ -65,6 +106,9 @@ export default function KiosPage() {
       name: '',
       address: '',
       phone: '',
+      desa: '',
+      kecamatan: '',
+      penanggungJawab: '',
     },
   });
 
@@ -75,9 +119,12 @@ export default function KiosPage() {
         name: kiosk.name,
         address: kiosk.address,
         phone: kiosk.phone,
+        desa: kiosk.desa || '',
+        kecamatan: kiosk.kecamatan || '',
+        penanggungJawab: kiosk.penanggungJawab || '',
       });
     } else {
-      form.reset({ name: '', address: '', phone: '' });
+      form.reset({ name: '', address: '', phone: '', desa: '', kecamatan: '', penanggungJawab: '' });
     }
     setIsDialogOpen(true);
   };
@@ -148,8 +195,12 @@ export default function KiosPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nama Kios</TableHead>
+                <TableHead>Penanggung Jawab</TableHead>
                 <TableHead>Alamat</TableHead>
+                <TableHead>Desa</TableHead>
+                <TableHead>Kecamatan</TableHead>
                 <TableHead>No. Telepon</TableHead>
+                <TableHead className="text-right">Tagihan Total</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -157,8 +208,12 @@ export default function KiosPage() {
               {kiosks.map((kiosk) => (
                 <TableRow key={kiosk.id}>
                   <TableCell className="font-medium">{kiosk.name}</TableCell>
+                  <TableCell>{kiosk.penanggungJawab}</TableCell>
                   <TableCell>{kiosk.address}</TableCell>
+                  <TableCell>{kiosk.desa}</TableCell>
+                  <TableCell>{kiosk.kecamatan}</TableCell>
                   <TableCell>{kiosk.phone}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalBills[kiosk.id] || 0)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -202,12 +257,12 @@ export default function KiosPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 py-4">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="col-span-2">
                     <FormLabel>Nama Kios</FormLabel>
                     <FormControl>
                       <Input placeholder="cth. Kios Tani Makmur" {...field} />
@@ -218,9 +273,22 @@ export default function KiosPage() {
               />
               <FormField
                 control={form.control}
+                name="penanggungJawab"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Penanggung Jawab</FormLabel>
+                    <FormControl>
+                      <Input placeholder="cth. Budi" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
                 name="address"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="col-span-2">
                     <FormLabel>Alamat</FormLabel>
                     <FormControl>
                       <Input placeholder="cth. Jl. Raya No. 123" {...field} />
@@ -231,9 +299,35 @@ export default function KiosPage() {
               />
               <FormField
                 control={form.control}
-                name="phone"
+                name="desa"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel>Desa</FormLabel>
+                    <FormControl>
+                      <Input placeholder="cth. Sukamaju" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="kecamatan"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Kecamatan</FormLabel>
+                    <FormControl>
+                      <Input placeholder="cth. Ciranjang" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
                     <FormLabel>No. Telepon</FormLabel>
                     <FormControl>
                       <Input placeholder="cth. 08123456789" {...field} />
@@ -242,7 +336,7 @@ export default function KiosPage() {
                   </FormItem>
                 )}
               />
-              <DialogFooter>
+              <DialogFooter className="col-span-2">
                 <DialogClose asChild>
                   <Button type="button" variant="secondary">
                     Batal

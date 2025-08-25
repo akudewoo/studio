@@ -10,6 +10,9 @@ export interface Kiosk {
   name: string;
   address: string;
   phone: string;
+  desa: string;
+  kecamatan: string;
+  penanggungJawab: string;
 }
 
 export interface Redemption {
