@@ -19,8 +19,6 @@ import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import type { Redemption, DORelease, KioskDistribution, Kiosk, Product } from '@/lib/types';
 import { MessageCircle } from 'lucide-react';
-import { generateDailySummary } from '@/ai/flows/summary-flow';
-
 
 export default function LaporanHarianPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -93,21 +91,32 @@ export default function LaporanHarianPage() {
           distByKiosk[kioskName].push({ product: productName, quantity: dist.quantity });
         });
         
-        const summaryData = {
-          date: format(selectedDate, 'd MMMM yyyy', { locale: id }),
-          redemptionQty: redemptionQty,
-          doReleaseQty: doReleaseQty,
-          distributions: distByKiosk
-        }
+        // Manual summary generation
+        const formattedDate = format(selectedDate, 'd MMMM yyyy', { locale: id });
+        let manualSummary = `*Laporan Harian - ${formattedDate}*\n\n`;
+        manualSummary += `📈 *Aktivitas Utama:*\n`;
+        manualSummary += `- Total Penebusan: *${redemptionQty.toLocaleString('id-ID')} Kg*\n`;
+        manualSummary += `- Total Pengeluaran DO: *${doReleaseQty.toLocaleString('id-ID')} Kg*\n\n`;
         
-        const aiSummary = await generateDailySummary(summaryData);
-        setSummary(aiSummary);
+        manualSummary += `🚚 *Penyaluran Kios:*\n`;
+        if (Object.keys(distByKiosk).length > 0) {
+            for (const kioskName in distByKiosk) {
+                manualSummary += `- *${kioskName}*:\n`;
+                distByKiosk[kioskName].forEach(item => {
+                    manualSummary += `  • ${item.product}: ${item.quantity.toLocaleString('id-ID')} Kg\n`;
+                });
+            }
+        } else {
+            manualSummary += `- Tidak ada data penyaluran hari ini.\n`;
+        }
+
+        setSummary(manualSummary);
 
     } catch (error) {
-        console.error("AI summary generation error:", error);
+        console.error("Summary generation error:", error);
         toast({
-            title: 'Gagal Membuat Ringkasan AI',
-            description: 'Terjadi kesalahan saat berkomunikasi dengan AI.',
+            title: 'Gagal Membuat Ringkasan',
+            description: 'Terjadi kesalahan saat mengolah data.',
             variant: 'destructive',
         });
     } finally {
@@ -135,14 +144,14 @@ export default function LaporanHarianPage() {
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <h1 className="font-headline text-lg font-semibold md:text-2xl">
-        Laporan Harian AI
+        Laporan Harian
       </h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Buat Ringkasan Harian Cerdas</CardTitle>
+          <CardTitle>Buat Ringkasan Harian</CardTitle>
           <CardDescription>
-            Pilih tanggal, dan biarkan AI membuatkan ringkasan aktivitas harian yang siap dikirim ke WhatsApp.
+            Pilih tanggal untuk membuat ringkasan aktivitas harian yang siap dikirim ke WhatsApp.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2">
@@ -155,16 +164,16 @@ export default function LaporanHarianPage() {
                 locale={id}
               />
               <Button onClick={handleGenerateSummary} disabled={isLoading || !selectedDate} className="w-full">
-                {isLoading ? 'AI Sedang Berpikir...' : 'Minta Ringkasan dari AI'}
+                {isLoading ? 'Membuat Ringkasan...' : 'Buat Ringkasan'}
               </Button>
           </div>
           
           <div className="flex flex-col gap-4">
             <div className="grid w-full gap-1.5">
-              <Label htmlFor="summary">Ringkasan AI</Label>
+              <Label htmlFor="summary">Ringkasan Laporan</Label>
               <Textarea
                   id="summary"
-                  placeholder="Ringkasan cerdas dari AI akan muncul di sini..."
+                  placeholder="Ringkasan laporan harian akan muncul di sini..."
                   value={summary}
                   readOnly
                   rows={10}
