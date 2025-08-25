@@ -308,6 +308,7 @@ export default function PenyaluranKiosPage() {
         const total = product ? dist.quantity * product.sellPrice : 0;
         const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
         const kurangBayar = total - dist.directPayment - totalTempo;
+        const keterangan = kurangBayar <= 0 ? "Lunas" : "Belum Lunas";
         return {
             'NO DO': dist.doNumber,
             'Tanggal': format(new Date(dist.date), 'dd/MM/yyyy'),
@@ -318,6 +319,7 @@ export default function PenyaluranKiosPage() {
             'Dibayar Langsung': dist.directPayment,
             'Pembayaran Tempo': totalTempo,
             'Kurang Bayar': kurangBayar,
+            'Keterangan': keterangan,
         };
     });
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -488,6 +490,7 @@ export default function PenyaluranKiosPage() {
                 <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('directPayment')}>Dibayar Langsung<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('paymentTempo')}>Pembayaran Tempo<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('kurangBayar')}>Kurang Bayar<ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead>Keterangan</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -497,12 +500,13 @@ export default function PenyaluranKiosPage() {
                 const total = product ? dist.quantity * product.sellPrice : 0;
                 const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
                 const kurangBayar = total - dist.directPayment - totalTempo;
+                const isUnpaid = kurangBayar > 0;
 
                 return (
                   <TableRow 
                     key={dist.id} 
                     data-state={selectedDists.includes(dist.id) && "selected"}
-                    className={cn({ 'bg-destructive/10 hover:bg-destructive/20 data-[state=selected]:bg-destructive/20': kurangBayar > 0 })}
+                    className={cn({ 'bg-destructive/10 hover:bg-destructive/20 data-[state=selected]:bg-destructive/20': isUnpaid })}
                   >
                     <TableCell>
                       <Checkbox
@@ -519,7 +523,10 @@ export default function PenyaluranKiosPage() {
                     <TableCell className="text-right">{formatCurrency(total)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dist.directPayment)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalTempo)}</TableCell>
-                    <TableCell className={cn("text-right", { "text-destructive font-semibold": kurangBayar > 0 })}>{formatCurrency(kurangBayar)}</TableCell>
+                    <TableCell className={cn("text-right", { "text-destructive font-semibold": isUnpaid })}>{formatCurrency(kurangBayar)}</TableCell>
+                    <TableCell className={cn({ "text-destructive font-semibold": isUnpaid })}>
+                        {isUnpaid ? 'Belum Lunas' : 'Lunas'}
+                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>

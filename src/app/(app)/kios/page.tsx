@@ -36,6 +36,7 @@ import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getPayments } from '@/services/paymentService';
 import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
+import { cn } from '@/lib/utils';
 
 
 const kioskSchema = z.object({
@@ -87,7 +88,11 @@ export default function KiosPage() {
     loadData();
   }, [toast]);
   
-  const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+  const formatCurrency = (value: number) => {
+    const isNegative = value < 0;
+    const formattedValue = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(value));
+    return isNegative ? `(${formattedValue})` : formattedValue;
+  };
 
   const totalBills = useMemo(() => {
     const bills: Record<string, number> = {};
@@ -454,8 +459,15 @@ export default function KiosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedAndFilteredKiosks.map((kiosk) => (
-                <TableRow key={kiosk.id} data-state={selectedKiosks.includes(kiosk.id) && "selected"}>
+              {sortedAndFilteredKiosks.map((kiosk) => {
+                const bill = totalBills[kiosk.id] || 0;
+                const hasBill = bill > 0;
+                return (
+                <TableRow 
+                  key={kiosk.id} 
+                  data-state={selectedKiosks.includes(kiosk.id) && "selected"}
+                  className={cn({ 'bg-destructive/10 hover:bg-destructive/20 text-destructive': hasBill })}
+                >
                    <TableCell>
                     <Checkbox
                       checked={selectedKiosks.includes(kiosk.id)}
@@ -469,7 +481,7 @@ export default function KiosPage() {
                   <TableCell>{kiosk.desa}</TableCell>
                   <TableCell>{kiosk.kecamatan}</TableCell>
                   <TableCell>{kiosk.phone}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(totalBills[kiosk.id] || 0)}</TableCell>
+                  <TableCell className={cn("text-right", { "font-semibold": hasBill })}>{formatCurrency(bill)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -494,7 +506,7 @@ export default function KiosPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
           </div>
