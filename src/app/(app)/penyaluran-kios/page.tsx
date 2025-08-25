@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -22,13 +22,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { KioskDistribution, Kiosk, Product, Redemption, Payment, DORelease } from '@/lib/types';
 import { getKioskDistributions, addKioskDistribution, updateKioskDistribution, deleteKioskDistribution } from '@/services/kioskDistributionService';
@@ -37,10 +38,11 @@ import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
 import { getPayments } from '@/services/paymentService';
 import { getDOReleases } from '@/services/doReleaseService';
+import { cn } from '@/lib/utils';
 
 const distributionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
-  date: z.string().min(1, { message: 'Tanggal harus diisi' }),
+  date: z.date({ required_error: 'Tanggal harus diisi' }),
   kioskId: z.string().min(1, { message: 'Kios harus dipilih' }),
   quantity: z.coerce.number().min(1, { message: 'QTY harus lebih dari 0' }),
   directPayment: z.coerce.number().min(0, { message: 'Pembayaran harus positif' }),
@@ -79,7 +81,7 @@ export default function PenyaluranKiosPage() {
 
   const form = useForm<z.infer<typeof distributionSchema>>({
     resolver: zodResolver(distributionSchema),
-    defaultValues: { doNumber: '', date: format(new Date(), 'yyyy-MM-dd'), kioskId: '', quantity: 1, directPayment: 0 },
+    defaultValues: { doNumber: '', date: new Date(), kioskId: '', quantity: 1, directPayment: 0 },
   });
   
   const getDetails = (doNumber: string) => {
@@ -95,8 +97,8 @@ export default function PenyaluranKiosPage() {
 
   const handleDialogOpen = (dist: KioskDistribution | null) => {
     setEditingDist(dist);
-    if (dist) form.reset({ ...dist, date: format(new Date(dist.date), 'yyyy-MM-dd') });
-    else form.reset({ doNumber: '', date: format(new Date(), 'yyyy-MM-dd'), kioskId: '', quantity: 1, directPayment: 0 });
+    if (dist) form.reset({ ...dist, date: new Date(dist.date) });
+    else form.reset({ doNumber: '', date: new Date(), kioskId: '', quantity: 1, directPayment: 0 });
     setIsDialogOpen(true);
   };
 
@@ -121,7 +123,7 @@ export default function PenyaluranKiosPage() {
         }
     }
     
-    const distributionData = { ...values, date: new Date(values.date).toISOString() };
+    const distributionData = { ...values, date: values.date.toISOString() };
 
     try {
       if (editingDist) {
@@ -201,9 +203,47 @@ export default function PenyaluranKiosPage() {
                   <SelectContent>{doReleases.map(r => <SelectItem key={r.doNumber} value={r.doNumber}>{r.doNumber} ({getDetails(r.doNumber).product?.name})</SelectItem>)}</SelectContent>
                 </Select><FormMessage /></FormItem>
               )} />
-              <FormField name="date" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Tanggal</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Tanggal</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd/MM/yyyy')
+                            ) : (
+                              <span>Pilih tanggal</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date > new Date() || date < new Date('1900-01-01')
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField name="kioskId" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>Nama Kios</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Pilih Kios" /></SelectTrigger></FormControl>

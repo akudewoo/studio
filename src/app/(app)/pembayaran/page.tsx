@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -22,21 +22,23 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { Payment, Kiosk, KioskDistribution } from '@/lib/types';
 import { getPayments, addPayment, updatePayment, deletePayment } from '@/services/paymentService';
 import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
+import { cn } from '@/lib/utils';
 
 const paymentSchema = z.object({
-  date: z.string().min(1, { message: 'Tanggal harus diisi' }),
+  date: z.date({ required_error: 'Tanggal harus diisi' }),
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
   kioskId: z.string().min(1, { message: 'Kios harus dipilih' }),
   amount: z.coerce.number().min(1, { message: 'Jumlah bayar harus lebih dari 0' }),
@@ -69,7 +71,7 @@ export default function PembayaranPage() {
 
   const form = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), doNumber: '', kioskId: '', amount: 0 },
+    defaultValues: { date: new Date(), doNumber: '', kioskId: '', amount: 0 },
   });
   
   const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
@@ -91,8 +93,8 @@ export default function PembayaranPage() {
 
   const handleDialogOpen = (payment: Payment | null) => {
     setEditingPayment(payment);
-    if (payment) form.reset({ ...payment, date: format(new Date(payment.date), 'yyyy-MM-dd') });
-    else form.reset({ date: format(new Date(), 'yyyy-MM-dd'), doNumber: '', kioskId: '', amount: 0 });
+    if (payment) form.reset({ ...payment, date: new Date(payment.date) });
+    else form.reset({ date: new Date(), doNumber: '', kioskId: '', amount: 0 });
     setIsDialogOpen(true);
   };
 
@@ -108,7 +110,7 @@ export default function PembayaranPage() {
 
   const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
     try {
-      const paymentData = { ...values, date: new Date(values.date).toISOString() };
+      const paymentData = { ...values, date: values.date.toISOString() };
       if (editingPayment) {
         await updatePayment(editingPayment.id, paymentData);
         setPayments(payments.map((p) => (p.id === editingPayment.id ? { id: p.id, ...paymentData } : p)));
@@ -172,9 +174,47 @@ export default function PembayaranPage() {
           <DialogHeader><DialogTitle className="font-headline">{editingPayment ? 'Ubah' : 'Tambah'} Pembayaran</DialogTitle></DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-              <FormField name="date" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Tanggal</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Tanggal</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd/MM/yyyy')
+                            ) : (
+                              <span>Pilih tanggal</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date > new Date() || date < new Date('1900-01-01')
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField name="doNumber" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>Transaksi (NO DO - Kios)</FormLabel><Select onValueChange={(value) => {
                     const [doNum, kioskId] = value.split('|');

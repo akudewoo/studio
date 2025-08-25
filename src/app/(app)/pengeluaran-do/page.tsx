@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -22,22 +22,24 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { DORelease, Redemption, Product } from '@/lib/types';
 import { getDOReleases, addDORelease, updateDORelease, deleteDORelease } from '@/services/doReleaseService';
 import { getRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
+import { cn } from '@/lib/utils';
 
 const doReleaseSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
-  date: z.string().min(1, { message: 'Tanggal harus diisi' }),
+  date: z.date({ required_error: 'Tanggal harus diisi' }),
   quantity: z.coerce.number().min(1, { message: 'QTY harus lebih dari 0' }),
 });
 
@@ -70,7 +72,7 @@ export default function PengeluaranDOPage() {
     resolver: zodResolver(doReleaseSchema),
     defaultValues: {
       doNumber: '',
-      date: format(new Date(), 'yyyy-MM-dd'),
+      date: new Date(),
       quantity: 1,
     },
   });
@@ -91,16 +93,15 @@ export default function PengeluaranDOPage() {
 
   const handleDialogOpen = (release: DORelease | null) => {
     setEditingRelease(release);
-    const redemption = release ? redemptionMap[release.doNumber] : null;
-    if (release && redemption) {
+    if (release) {
       form.reset({
         ...release,
-        date: format(new Date(release.date), 'yyyy-M-d'),
+        date: new Date(release.date),
       });
     } else {
       form.reset({
         doNumber: '',
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: new Date(),
         quantity: 1,
       });
     }
@@ -140,7 +141,7 @@ export default function PengeluaranDOPage() {
       return;
     }
     
-    const releaseData = { ...values, date: new Date(values.date).toISOString(), redemptionQuantity: redemption.quantity };
+    const releaseData = { ...values, date: values.date.toISOString(), redemptionQuantity: redemption.quantity };
 
     try {
       if (editingRelease) {
@@ -246,9 +247,47 @@ export default function PengeluaranDOPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField name="date" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Tanggal</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Tanggal</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd/MM/yyyy')
+                            ) : (
+                              <span>Pilih tanggal</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date > new Date() || date < new Date('1900-01-01')
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField name="quantity" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>QTY</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
