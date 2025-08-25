@@ -229,9 +229,27 @@ export default function PenebusanPage() {
               <FormField name="doNumber" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>NO DO</FormLabel><FormControl><Input placeholder="cth. DO-2024-001" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-              <FormField name="supplier" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Supplier</FormLabel><FormControl><Input placeholder="cth. PT Pupuk Indonesia" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+              <FormField
+                control={form.control}
+                name="supplier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih supplier" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="PT. PETROKIMIA GRESIK">PT. PETROKIMIA GRESIK</SelectItem>
+                        <SelectItem value="PT. PUPUK SRIWIJAYA">PT. PUPUK SRIWIJAYA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField name="date" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>Tanggal Penebusan</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
