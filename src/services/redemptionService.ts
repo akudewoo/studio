@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Redemption, RedemptionInput } from '@/lib/types';
 
@@ -21,9 +21,9 @@ export async function addMultipleRedemptions(redemptions: RedemptionInput[]): Pr
     return newRedemptions;
 }
 
-
-export async function getRedemptions(): Promise<Redemption[]> {
-    const snapshot = await getDocs(redemptionsCollection);
+export async function getRedemptions(branchId: string): Promise<Redemption[]> {
+    const q = query(redemptionsCollection, where("branchId", "==", branchId));
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Redemption));
 }
 

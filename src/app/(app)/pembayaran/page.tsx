@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -7,8 +8,6 @@ import * as z from 'zod';
 import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +42,7 @@ import { getRedemptions } from '@/services/redemptionService';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { exportToPdf } from '@/lib/pdf-export';
+import { useBranch } from '@/hooks/use-branch';
 
 
 const paymentSchema = z.object({
@@ -93,6 +93,7 @@ function OutstandingBalanceDisplay({ control, distributions, redemptions, produc
 }
 
 export default function PembayaranPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
@@ -109,12 +110,13 @@ export default function PembayaranPage() {
 
   useEffect(() => {
     async function loadData() {
+        if (!activeBranch) return;
       try {
-        setPayments(await getPayments());
-        setDistributions(await getKioskDistributions());
-        setKiosks(await getKiosks());
-        setProducts(await getProducts());
-        setRedemptions(await getRedemptions());
+        setPayments(await getPayments(activeBranch.id));
+        setDistributions(await getKioskDistributions(activeBranch.id));
+        setKiosks(await getKiosks(activeBranch.id));
+        setProducts(await getProducts(activeBranch.id));
+        setRedemptions(await getRedemptions(activeBranch.id));
       } catch (error) {
         toast({
           title: 'Gagal memuat data',
@@ -124,7 +126,7 @@ export default function PembayaranPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
   
   const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
@@ -274,8 +276,9 @@ export default function PembayaranPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
+    if (!activeBranch) return;
     try {
-      const paymentData = { ...values, date: values.date.toISOString() };
+      const paymentData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
       if (editingPayment) {
         await updatePayment(editingPayment.id, paymentData);
         setPayments(payments.map((p) => (p.id === editingPayment.id ? { id: p.id, ...paymentData } : p)));
@@ -366,7 +369,7 @@ export default function PembayaranPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeBranch) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -396,6 +399,7 @@ export default function PembayaranPage() {
                     doNumber: String(item['NO DO']),
                     kioskId: kioskId,
                     amount: item['Total Bayar'],
+                    branchId: activeBranch.id,
                 };
                 
                 const parsed = paymentSchema.strip().safeParse(paymentData);
@@ -403,6 +407,7 @@ export default function PembayaranPage() {
                     newPayments.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
+                      branchId: activeBranch.id
                     });
                 } else {
                     console.warn('Invalid item skipped:', item, parsed.error);
@@ -437,6 +442,10 @@ export default function PembayaranPage() {
     };
     reader.readAsArrayBuffer(file);
   };
+
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -6,8 +7,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,10 +17,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -44,6 +39,7 @@ import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
+import { useBranch } from '@/hooks/use-branch';
 
 
 const kioskSchema = z.object({
@@ -61,6 +57,7 @@ type SortConfig = {
 } | null;
 
 export default function KiosPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -77,12 +74,13 @@ export default function KiosPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeBranch) return;
       try {
-        setKiosks(await getKiosks());
-        setDistributions(await getKioskDistributions());
-        setPayments(await getPayments());
-        setProducts(await getProducts());
-        setRedemptions(await getRedemptions());
+        setKiosks(await getKiosks(activeBranch.id));
+        setDistributions(await getKioskDistributions(activeBranch.id));
+        setPayments(await getPayments(activeBranch.id));
+        setProducts(await getProducts(activeBranch.id));
+        setRedemptions(await getRedemptions(activeBranch.id));
       } catch (error) {
         console.error("Firebase Error: ", error);
         toast({
@@ -93,7 +91,7 @@ export default function KiosPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
   
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
@@ -259,6 +257,7 @@ export default function KiosPage() {
 
 
   const onSubmit = async (values: z.infer<typeof kioskSchema>) => {
+    if (!activeBranch) return;
     try {
       if (editingKiosk) {
         await updateKiosk(editingKiosk.id, values);
@@ -270,7 +269,7 @@ export default function KiosPage() {
           description: 'Data kios berhasil diperbarui.',
         });
       } else {
-        const newKiosk = await addKiosk(values);
+        const newKiosk = await addKiosk({ ...values, branchId: activeBranch.id });
         setKiosks([...kiosks, newKiosk]);
         toast({
           title: 'Sukses',
@@ -345,7 +344,7 @@ export default function KiosPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeBranch) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -365,11 +364,12 @@ export default function KiosPage() {
                     desa: item['Desa'],
                     kecamatan: item['Kecamatan'],
                     penanggungJawab: item['Penanggung Jawab'],
+                    branchId: activeBranch.id
                 };
                 
                 const parsed = kioskSchema.strip().safeParse(kioskData);
                 if (parsed.success) {
-                    newKiosks.push(parsed.data);
+                    newKiosks.push({ ...parsed.data, branchId: activeBranch.id });
                 } else {
                     console.warn('Invalid item skipped:', item, parsed.error);
                 }
@@ -404,6 +404,9 @@ export default function KiosPage() {
     reader.readAsArrayBuffer(file);
   };
 
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">

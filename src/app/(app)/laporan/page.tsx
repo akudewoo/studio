@@ -5,9 +5,6 @@ import { useState, useEffect, useRef } from 'react';
 import { format, isWithinInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, subDays, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +22,7 @@ import type { Redemption, DORelease, KioskDistribution, Kiosk, Product, Payment 
 import { Download } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { exportToPdf } from '@/lib/pdf-export';
+import { useBranch } from '@/hooks/use-branch';
 
 type ReportType = 'harian' | 'mingguan' | 'bulanan';
 
@@ -67,6 +65,7 @@ const tableStyles = `
 `;
 
 export default function LaporanPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedWeek, setSelectedWeek] = useState<Date | undefined>();
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>();
@@ -95,15 +94,16 @@ export default function LaporanPage() {
     setSelectedMonth(today);
 
     async function loadData() {
+      if (!activeBranch) return;
       try {
         setIsLoading(true);
         const [redemptionsData, doReleasesData, distributionsData, kiosksData, productsData, paymentsData] = await Promise.all([
-          getRedemptions(),
-          getDOReleases(),
-          getKioskDistributions(),
-          getKiosks(),
-          getProducts(),
-          getPayments(),
+          getRedemptions(activeBranch.id),
+          getDOReleases(activeBranch.id),
+          getKioskDistributions(activeBranch.id),
+          getKiosks(activeBranch.id),
+          getProducts(activeBranch.id),
+          getPayments(activeBranch.id),
         ]);
         setRedemptions(redemptionsData);
         setDoReleases(doReleasesData);
@@ -122,7 +122,7 @@ export default function LaporanPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
   
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
@@ -389,26 +389,29 @@ export default function LaporanPage() {
     }
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (!summary || !reportContentRef.current) {
         toast({ title: 'Laporan Kosong', description: 'Buat laporan terlebih dahulu.', variant: 'destructive' });
         return;
     }
+
+    const { jsPDF } = await import('jspdf');
+    await import('jspdf-autotable');
+
     const doc = new jsPDF();
     const parser = new DOMParser();
     const htmlDoc = parser.parseFromString(summary, 'text/html');
 
-    // Use querySelector to find all tables
     const tables = htmlDoc.querySelectorAll('.report-table, .summary-table');
     const titleEl = htmlDoc.querySelector('h3');
     
     doc.text(titleEl?.innerText || summaryTitle, 14, 15);
     let startY = 25;
 
-    tables.forEach((table, index) => {
-        const titleEl = table.previousElementSibling;
-        if(titleEl && titleEl.tagName === 'H4') {
-            doc.text(titleEl.textContent || '', 14, startY);
+    tables.forEach((table) => {
+        const h4 = table.previousElementSibling;
+        if(h4 && h4.tagName === 'H4') {
+            doc.text(h4.textContent || '', 14, startY);
             startY += 10;
         }
 
@@ -416,7 +419,7 @@ export default function LaporanPage() {
             html: table,
             startY: startY,
             theme: 'grid',
-            headStyles: { fillColor: '#020617', textColor: '#ffffff' },
+            headStyles: { fillColor: [22, 163, 74] }, // example green color
             didDrawPage: (data: any) => {
                 startY = data.cursor.y + 10;
             },
@@ -455,11 +458,15 @@ export default function LaporanPage() {
       ) : (
         <Skeleton className="h-[298px] w-[320px] rounded-md border" />
       )}
-      <Button onClick={() => generateSummary(reportType)} disabled={isLoading || !date || !mounted} className="w-full">
+      <Button onClick={() => generateSummary(reportType)} disabled={isLoading || !date || !mounted || branchLoading} className="w-full">
         {isLoading ? 'Membuat Laporan...' : `Buat Laporan ${reportType.charAt(0).toUpperCase() + reportType.slice(1)}`}
       </Button>
     </div>
   );
+
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">

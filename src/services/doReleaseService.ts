@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { DORelease, DOReleaseInput } from '@/lib/types';
 
@@ -21,8 +21,9 @@ export async function addMultipleDOReleases(doReleases: DOReleaseInput[]): Promi
     return newReleases;
 }
 
-export async function getDOReleases(): Promise<DORelease[]> {
-    const snapshot = await getDocs(doReleasesCollection);
+export async function getDOReleases(branchId: string): Promise<DORelease[]> {
+    const q = query(doReleasesCollection, where("branchId", "==", branchId));
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DORelease));
 }
 

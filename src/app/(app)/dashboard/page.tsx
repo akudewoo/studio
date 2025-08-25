@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import { Package, Store, CircleDollarSign, AlertCircle, TrendingUp, Trophy } from 'lucide-react';
+import { Package, Store, CircleDollarSign, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -19,9 +19,10 @@ import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getPayments } from '@/services/paymentService';
 
 import type { Kiosk, Product, Redemption, DORelease, KioskDistribution, Payment } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { useBranch } from '@/hooks/use-branch';
 
 export default function DashboardPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [data, setData] = useState<{
     kiosks: Kiosk[];
     products: Product[];
@@ -34,15 +35,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeBranch) return;
       try {
         setLoading(true);
         const [kiosks, products, redemptions, doReleases, distributions, payments] = await Promise.all([
-          getKiosks(),
-          getProducts(),
-          getRedemptions(),
-          getDOReleases(),
-          getKioskDistributions(),
-          getPayments(),
+          getKiosks(activeBranch.id),
+          getProducts(activeBranch.id),
+          getRedemptions(activeBranch.id),
+          getDOReleases(activeBranch.id),
+          getKioskDistributions(activeBranch.id),
+          getPayments(activeBranch.id),
         ]);
         setData({ kiosks, products, redemptions, doReleases, distributions, payments });
       } catch (error) {
@@ -52,7 +54,7 @@ export default function DashboardPage() {
       }
     }
     loadData();
-  }, []);
+  }, [activeBranch]);
 
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
@@ -176,7 +178,7 @@ export default function DashboardPage() {
     return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks, monthlySales, topSellingProducts };
   }, [data]);
   
-  if (loading) {
+  if (loading || branchLoading) {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
           <h1 className="font-headline text-lg font-semibold md:text-2xl">Dasbor</h1>
@@ -194,7 +196,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <h1 className="font-headline text-lg font-semibold md:text-2xl">Dasbor</h1>
+      <h1 className="font-headline text-lg font-semibold md:text-2xl">Dasbor - {activeBranch?.name}</h1>
       
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -356,7 +358,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
-
-    

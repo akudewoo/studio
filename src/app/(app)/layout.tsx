@@ -24,12 +24,16 @@ import {
   Store,
   Truck,
   Warehouse,
-  Settings,
   FileText,
   LayoutDashboard,
   Newspaper,
+  ChevronDown,
+  Building,
 } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
+import { BranchProvider, useBranch } from '@/hooks/use-branch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const navItems = [
   { href: '/dashboard', label: 'Dasbor', icon: LayoutDashboard },
@@ -42,6 +46,54 @@ const navItems = [
   { href: '/ringkasan-harian', label: 'Ringkasan Harian', icon: Newspaper },
   { href: '/laporan', label: 'Laporan', icon: FileText },
 ];
+
+const BranchSelector = () => {
+    const { branches, activeBranch, setActiveBranch, loading } = useBranch();
+    const [popoverOpen, setPopoverOpen] = React.useState(false);
+
+    if (loading) {
+        return (
+            <div className="p-2">
+                <Skeleton className="h-10 w-full" />
+            </div>
+        )
+    }
+
+    return (
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    className="h-10 w-full justify-start px-2 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                >
+                    <Building className="size-5 shrink-0" />
+                    <div className="ml-2 flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                        <span className="text-xs text-muted-foreground">Cabang</span>
+                        <span className="text-sm font-semibold">{activeBranch?.name || 'Pilih Cabang'}</span>
+                    </div>
+                     <ChevronDown className="ml-auto size-4 shrink-0 group-data-[collapsible=icon]:hidden" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--sidebar-width)] p-1" align="start">
+                 <div className="flex flex-col gap-1">
+                    {branches.map(branch => (
+                        <Button
+                            key={branch.id}
+                            variant={activeBranch?.id === branch.id ? 'default' : 'ghost'}
+                            className="w-full justify-start"
+                            onClick={() => {
+                                setActiveBranch(branch);
+                                setPopoverOpen(false);
+                            }}
+                        >
+                            {branch.name}
+                        </Button>
+                    ))}
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
+}
 
 const AppSidebar = () => {
     const pathname = usePathname();
@@ -61,10 +113,11 @@ const AppSidebar = () => {
                     <Link href="/produk">
                         <Logo className="size-6 shrink-0 text-primary" />
                         <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                            TANI MAKMUR MAGETAN
+                            TANI MAKMUR
                         </span>
                     </Link>
                 </Button>
+                <BranchSelector />
             </SidebarHeader>
             <SidebarContent>
                 <SidebarMenu>
@@ -97,15 +150,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
   
   return (
-    <SidebarProvider>
-      {mounted ? <AppSidebar /> : null}
-      <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
-          <SidebarTrigger />
-          <h1 className="font-headline text-lg font-semibold">TANI MAKMUR MAGETAN</h1>
-        </header>
-        {children}
-      </SidebarInset>
-    </SidebarProvider>
+    <BranchProvider>
+        <SidebarProvider>
+        {mounted ? <AppSidebar /> : null}
+        <SidebarInset>
+            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
+            <SidebarTrigger />
+            <h1 className="font-headline text-lg font-semibold">TANI MAKMUR</h1>
+            </header>
+            {children}
+        </SidebarInset>
+        </SidebarProvider>
+    </BranchProvider>
   );
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -6,12 +7,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -37,6 +35,7 @@ import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultiplePr
 import { getRedemptions } from '@/services/redemptionService';
 import { getDOReleases } from '@/services/doReleaseService';
 import { exportToPdf } from '@/lib/pdf-export';
+import { useBranch } from '@/hooks/use-branch';
 
 
 const productSchema = z.object({
@@ -51,6 +50,7 @@ type SortConfig = {
 } | null;
 
 export default function ProdukPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [products, setProducts] = useState<Product[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
@@ -64,10 +64,11 @@ export default function ProdukPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeBranch) return;
       try {
-        setProducts(await getProducts());
-        setRedemptions(await getRedemptions());
-        setDoReleases(await getDOReleases());
+        setProducts(await getProducts(activeBranch.id));
+        setRedemptions(await getRedemptions(activeBranch.id));
+        setDoReleases(await getDOReleases(activeBranch.id));
       } catch (error) {
         console.error("Firebase Error: ", error);
         toast({
@@ -78,7 +79,7 @@ export default function ProdukPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
@@ -214,7 +215,8 @@ export default function ProdukPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof productSchema>) => {
-    
+    if (!activeBranch) return;
+
     if (editingProduct) {
       const originalProducts = [...products];
       const updatedProduct = { ...editingProduct, ...values };
@@ -237,19 +239,15 @@ export default function ProdukPage() {
         setEditingProduct(null);
       }
     } else {
-      const tempId = `temp-${Date.now()}`;
-      const newProductOptimistic: Product = { id: tempId, ...values };
-      setProducts(prevProducts => [...prevProducts, newProductOptimistic]);
-
+      const optimisticProduct: ProductInput = { ...values, branchId: activeBranch.id };
       try {
-        const newProduct = await addProduct(values);
-        setProducts(prevProducts => prevProducts.map(p => p.id === tempId ? newProduct : p));
+        const newProduct = await addProduct(optimisticProduct);
+        setProducts(prevProducts => [...prevProducts, newProduct]);
         toast({
           title: 'Sukses',
           description: 'Produk baru berhasil ditambahkan.',
         });
       } catch (error) {
-        setProducts(prevProducts => prevProducts.filter(p => p.id !== tempId));
         toast({
           title: 'Error',
           description: 'Gagal menyimpan produk.',
@@ -333,7 +331,8 @@ export default function ProdukPage() {
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    if (!fileInputRef.current?.files || !activeBranch) return;
+    const file = fileInputRef.current.files[0];
     if (!file) return;
 
     const reader = new FileReader();
@@ -351,11 +350,12 @@ export default function ProdukPage() {
                     name: item['Nama Produk'],
                     purchasePrice: item['Harga Beli'],
                     sellPrice: item['Harga Jual'],
+                    branchId: activeBranch.id,
                 };
                 
                 const parsed = productSchema.strip().safeParse(productData);
                 if (parsed.success) {
-                    newProducts.push(parsed.data);
+                    newProducts.push({ ...parsed.data, branchId: activeBranch.id });
                 } else {
                     console.warn('Invalid item skipped:', item, parsed.error);
                 }
@@ -382,7 +382,6 @@ export default function ProdukPage() {
                 variant: 'destructive',
             });
         } finally {
-            // Reset file input
             if(fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -391,6 +390,10 @@ export default function ProdukPage() {
     reader.readAsArrayBuffer(file);
   };
 
+
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">

@@ -19,8 +19,10 @@ import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import type { Redemption, DORelease, KioskDistribution, Kiosk, Product } from '@/lib/types';
 import { MessageCircle } from 'lucide-react';
+import { useBranch } from '@/hooks/use-branch';
 
 export default function RingkasanHarianPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [summary, setSummary] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -36,13 +38,14 @@ export default function RingkasanHarianPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeBranch) return;
       try {
         const [redemptionsData, doReleasesData, distributionsData, kiosksData, productsData] = await Promise.all([
-          getRedemptions(),
-          getDOReleases(),
-          getKioskDistributions(),
-          getKiosks(),
-          getProducts(),
+          getRedemptions(activeBranch.id),
+          getDOReleases(activeBranch.id),
+          getKioskDistributions(activeBranch.id),
+          getKiosks(activeBranch.id),
+          getProducts(activeBranch.id),
         ]);
         setRedemptions(redemptionsData);
         setDoReleases(doReleasesData);
@@ -58,7 +61,7 @@ export default function RingkasanHarianPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
 
   const handleGenerateSummary = async () => {
     if (!selectedDate) {
@@ -173,6 +176,10 @@ export default function RingkasanHarianPage() {
     const whatsappUrl = `https://wa.me/${formattedPhoneNumber}?text=${encodedSummary}`;
     window.open(whatsappUrl, '_blank');
   };
+
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">

@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Payment, PaymentInput } from '@/lib/types';
 
@@ -21,8 +21,9 @@ export async function addMultiplePayments(payments: PaymentInput[]): Promise<Pay
     return newPayments;
 }
 
-export async function getPayments(): Promise<Payment[]> {
-    const snapshot = await getDocs(paymentsCollection);
+export async function getPayments(branchId: string): Promise<Payment[]> {
+    const q = query(paymentsCollection, where("branchId", "==", branchId));
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
 }
 

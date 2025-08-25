@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -7,8 +8,6 @@ import * as z from 'zod';
 import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +43,7 @@ import { getDOReleases } from '@/services/doReleaseService';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { exportToPdf } from '@/lib/pdf-export';
+import { useBranch } from '@/hooks/use-branch';
 
 const distributionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
@@ -59,6 +59,7 @@ type SortConfig = {
 } | null;
 
 export default function PenyaluranKiosPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -76,13 +77,14 @@ export default function PenyaluranKiosPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeBranch) return;
       try {
-        setDistributions(await getKioskDistributions());
-        setDoReleases(await getDOReleases());
-        setRedemptions(await getRedemptions());
-        setProducts(await getProducts());
-        setKiosks(await getKiosks());
-        setPayments(await getPayments());
+        setDistributions(await getKioskDistributions(activeBranch.id));
+        setDoReleases(await getDOReleases(activeBranch.id));
+        setRedemptions(await getRedemptions(activeBranch.id));
+        setProducts(await getProducts(activeBranch.id));
+        setKiosks(await getKiosks(activeBranch.id));
+        setPayments(await getPayments(activeBranch.id));
       } catch (error) {
         toast({
           title: 'Gagal memuat data',
@@ -92,7 +94,7 @@ export default function PenyaluranKiosPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
   
   const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
   
@@ -277,6 +279,7 @@ export default function PenyaluranKiosPage() {
 
 
   const onSubmit = async (values: z.infer<typeof distributionSchema>) => {
+    if (!activeBranch) return;
     const { doRelease } = getDetails(values.doNumber);
     const distributedQty = distributions.filter(d => d.doNumber === values.doNumber).reduce((sum, d) => sum + d.quantity, 0);
 
@@ -287,7 +290,7 @@ export default function PenyaluranKiosPage() {
         }
     }
     
-    const distributionData = { ...values, date: values.date.toISOString() };
+    const distributionData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
 
     try {
       if (editingDist) {
@@ -381,7 +384,7 @@ export default function PenyaluranKiosPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeBranch) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -412,6 +415,7 @@ export default function PenyaluranKiosPage() {
                     kioskId: kioskId,
                     quantity: item['QTY'],
                     directPayment: item['Dibayar Langsung'] || 0,
+                    branchId: activeBranch.id,
                 };
                 
                 const parsed = distributionSchema.strip().safeParse(distData);
@@ -419,6 +423,7 @@ export default function PenyaluranKiosPage() {
                     newDistributions.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
+                      branchId: activeBranch.id,
                     });
                 } else {
                     console.warn('Invalid item skipped:', item, parsed.error);
@@ -454,6 +459,10 @@ export default function PenyaluranKiosPage() {
     reader.readAsArrayBuffer(file);
   };
 
+
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">

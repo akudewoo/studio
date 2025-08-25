@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { KioskDistribution, KioskDistributionInput } from '@/lib/types';
 
@@ -21,8 +21,9 @@ export async function addMultipleKioskDistributions(distributions: KioskDistribu
     return newDistributions;
 }
 
-export async function getKioskDistributions(): Promise<KioskDistribution[]> {
-    const snapshot = await getDocs(kioskDistributionsCollection);
+export async function getKioskDistributions(branchId: string): Promise<KioskDistribution[]> {
+    const q = query(kioskDistributionsCollection, where("branchId", "==", branchId));
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KioskDistribution));
 }
 

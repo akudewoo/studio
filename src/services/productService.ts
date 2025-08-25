@@ -1,10 +1,10 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Product, ProductInput } from '@/lib/types';
 
 const productsCollection = collection(db, 'products');
 
-export async function addProduct(product: Omit<Product, 'id'>): Promise<Product> {
+export async function addProduct(product: ProductInput): Promise<Product> {
     const docRef = await addDoc(productsCollection, product);
     return { id: docRef.id, ...product };
 }
@@ -21,8 +21,9 @@ export async function addMultipleProducts(products: ProductInput[]): Promise<Pro
     return newProducts;
 }
 
-export async function getProducts(): Promise<Product[]> {
-    const snapshot = await getDocs(productsCollection);
+export async function getProducts(branchId: string): Promise<Product[]> {
+    const q = query(productsCollection, where("branchId", "==", branchId));
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
 }
 

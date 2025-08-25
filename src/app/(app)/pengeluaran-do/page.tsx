@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -7,8 +8,6 @@ import * as z from 'zod';
 import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +39,7 @@ import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { exportToPdf } from '@/lib/pdf-export';
+import { useBranch } from '@/hooks/use-branch';
 
 
 const doReleaseSchema = z.object({
@@ -59,6 +59,7 @@ type SortConfig = {
 } | null;
 
 export default function PengeluaranDOPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -72,10 +73,11 @@ export default function PengeluaranDOPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeBranch) return;
       try {
-        setDoReleases(await getDOReleases());
-        setRedemptions(await getRedemptions());
-        setProducts(await getProducts());
+        setDoReleases(await getDOReleases(activeBranch.id));
+        setRedemptions(await getRedemptions(activeBranch.id));
+        setProducts(await getProducts(activeBranch.id));
       } catch (error) {
         toast({
           title: 'Gagal memuat data',
@@ -85,7 +87,7 @@ export default function PengeluaranDOPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
 
   const redemptionMap = useMemo(() => {
     return redemptions.reduce((map, r) => {
@@ -242,6 +244,8 @@ export default function PengeluaranDOPage() {
 
 
   const onSubmit = async (values: z.infer<typeof doReleaseSchema>) => {
+    if (!activeBranch) return;
+
     const redemption = redemptionMap[values.doNumber];
     if (!redemption) {
       toast({ title: 'Error', description: 'Data penebusan tidak ditemukan.', variant: 'destructive' });
@@ -257,7 +261,7 @@ export default function PengeluaranDOPage() {
       return;
     }
     
-    const releaseData = { ...values, date: values.date.toISOString(), redemptionQuantity: redemption.quantity };
+    const releaseData = { ...values, date: values.date.toISOString(), redemptionQuantity: redemption.quantity, branchId: activeBranch.id };
 
     try {
       if (editingRelease) {
@@ -342,7 +346,7 @@ export default function PengeluaranDOPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeBranch) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -368,14 +372,15 @@ export default function PengeluaranDOPage() {
                     date: excelDate,
                     quantity: item['QTY DO'],
                     redemptionQuantity: redemption.quantity, // Get from existing redemption
+                    branchId: activeBranch.id,
                 };
                 
-                const parsed = doReleaseSchema.strip().safeParse(releaseData);
+                const parsed = doReleaseImportSchema.strip().safeParse(releaseData);
                 if (parsed.success) {
                     newReleases.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
-                      redemptionQuantity: redemption.quantity,
+                      branchId: activeBranch.id,
                     });
                 } else {
                     console.warn('Invalid item skipped:', item, parsed.error);
@@ -411,6 +416,10 @@ export default function PengeluaranDOPage() {
     reader.readAsArrayBuffer(file);
   };
 
+
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">

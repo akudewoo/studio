@@ -1,8 +1,14 @@
+export interface Branch {
+  id: string;
+  name: string;
+}
+
 export interface Product {
   id: string;
   name: string;
   purchasePrice: number;
   sellPrice: number;
+  branchId: string;
 }
 
 export interface Kiosk {
@@ -13,6 +19,7 @@ export interface Kiosk {
   desa: string;
   kecamatan: string;
   penanggungJawab: string;
+  branchId: string;
 }
 
 export interface Redemption {
@@ -22,6 +29,7 @@ export interface Redemption {
   date: string;
   productId: string;
   quantity: number;
+  branchId: string;
 }
 
 export interface DORelease {
@@ -30,6 +38,7 @@ export interface DORelease {
     date: string;
     quantity: number;
     redemptionQuantity: number;
+    branchId: string;
 }
 
 export interface KioskDistribution {
@@ -39,6 +48,7 @@ export interface KioskDistribution {
     kioskId: string;
     quantity: number;
     directPayment: number;
+    branchId: string;
 }
 
 export interface Payment {
@@ -47,9 +57,11 @@ export interface Payment {
     doNumber: string;
     kioskId: string;
     amount: number;
+    branchId: string;
 }
 
 // Omit 'id' when creating a new entity
+export type BranchInput = Omit<Branch, 'id'>;
 export type ProductInput = Omit<Product, 'id'>;
 export type KioskInput = Omit<Kiosk, 'id'>;
 export type RedemptionInput = Omit<Redemption, 'id'>;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -7,8 +8,6 @@ import * as z from 'zod';
 import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +39,7 @@ import { getRedemptions, addRedemption, updateRedemption, deleteRedemption, dele
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
+import { useBranch } from '@/hooks/use-branch';
 
 const redemptionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus diisi' }),
@@ -55,6 +55,7 @@ type SortConfig = {
 } | null;
 
 export default function PenebusanPage() {
+  const { activeBranch, loading: branchLoading } = useBranch();
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -68,9 +69,10 @@ export default function PenebusanPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeBranch) return;
       try {
-        setRedemptions(await getRedemptions());
-        setProducts(await getProducts());
+        setRedemptions(await getRedemptions(activeBranch.id));
+        setProducts(await getProducts(activeBranch.id));
       } catch (error) {
         toast({
           title: 'Gagal memuat data',
@@ -80,7 +82,7 @@ export default function PenebusanPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [activeBranch, toast]);
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
@@ -233,7 +235,8 @@ export default function PenebusanPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof redemptionSchema>) => {
-    const redemptionData = { ...values, date: values.date.toISOString() };
+    if (!activeBranch) return;
+    const redemptionData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
     try {
       if (editingRedemption) {
         await updateRedemption(editingRedemption.id, redemptionData);
@@ -327,7 +330,7 @@ export default function PenebusanPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeBranch) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -358,6 +361,7 @@ export default function PenebusanPage() {
                     date: excelDate,
                     productId: productId,
                     quantity: item['QTY'],
+                    branchId: activeBranch.id,
                 };
                 
                 const parsed = redemptionSchema.strip().safeParse(redemptionData);
@@ -365,6 +369,7 @@ export default function PenebusanPage() {
                     newRedemptions.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
+                      branchId: activeBranch.id
                     });
                 } else {
                     console.warn('Invalid item skipped:', item, parsed.error);
@@ -401,6 +406,9 @@ export default function PenebusanPage() {
   };
 
 
+  if (branchLoading) {
+    return <div>Loading...</div>
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -431,7 +439,7 @@ export default function PenebusanPage() {
                   </SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Semua</SelectItem>
-                      {uniqueGroupValues.map(val => <SelectItem key={val} value={val}>{val}</SelectItem>)}
+                      {uniqueGroupValues.map(val => <SelectItem key={val as string} value={val as string}>{val as string}</SelectItem>)}
                   </SelectContent>
               </Select>
             )}
