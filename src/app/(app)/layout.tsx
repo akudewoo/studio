@@ -158,6 +158,11 @@ const AppSidebar = () => {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { settings, isLoaded } = useSettings();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!isLoaded) {
     return (
@@ -175,7 +180,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   return (
     <SidebarProvider>
-      <AppSidebar />
+        {mounted ? <AppSidebar /> : (
+            <Sidebar
+                collapsible={'icon'}
+                variant="sidebar"
+            >
+             <SidebarHeader>
+                <Button
+                    variant="ghost"
+                    className="h-10 w-full justify-start px-2 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center"
+                    asChild
+                >
+                    <Link href="/produk">
+                        <DefaultLogo className="size-6 shrink-0 text-primary" />
+                        <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
+                            AlurDistribusi
+                        </span>
+                    </Link>
+                </Button>
+            </SidebarHeader>
+            <SidebarContent>
+                <SidebarMenu>
+                {[...Array(6)].map((_, i) => (
+                    <SidebarMenuItem key={i}>
+                        <SidebarMenuButton>
+                            <div className="size-4 bg-muted rounded-md animate-pulse" />
+                            <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                ))}
+                </SidebarMenu>
+            </SidebarContent>
+            <SidebarContent className="!flex-grow-0">
+                 <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton>
+                           <div className="size-4 bg-muted rounded-md animate-pulse" />
+                           <div className="h-4 w-32 bg-muted rounded-md animate-pulse" />
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarContent>
+        </Sidebar>
+        )}
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
           <SidebarTrigger />
