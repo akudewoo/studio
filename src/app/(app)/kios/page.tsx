@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,7 @@ export default function KiosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingKiosk, setEditingKiosk] = useState<Kiosk | null>(null);
   const [selectedKiosks, setSelectedKiosks] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +80,19 @@ export default function KiosPage() {
   }, [toast]);
   
   const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+
+  const filteredKiosks = useMemo(() => {
+    if (!searchQuery) return kiosks;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return kiosks.filter(kiosk =>
+      kiosk.name.toLowerCase().includes(lowercasedQuery) ||
+      kiosk.penanggungJawab.toLowerCase().includes(lowercasedQuery) ||
+      kiosk.address.toLowerCase().includes(lowercasedQuery) ||
+      kiosk.desa.toLowerCase().includes(lowercasedQuery) ||
+      kiosk.kecamatan.toLowerCase().includes(lowercasedQuery) ||
+      kiosk.phone.toLowerCase().includes(lowercasedQuery)
+    );
+  }, [kiosks, searchQuery]);
 
   const totalBills = useMemo(() => {
     const bills: Record<string, number> = {};
@@ -201,7 +215,7 @@ export default function KiosPage() {
   
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedKiosks(kiosks.map(k => k.id));
+      setSelectedKiosks(filteredKiosks.map(k => k.id));
     } else {
       setSelectedKiosks([]);
     }
@@ -216,7 +230,7 @@ export default function KiosPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = kiosks.map(k => ({
+    const dataToExport = filteredKiosks.map(k => ({
         'Nama Kios': k.name,
         'Penanggung Jawab': k.penanggungJawab,
         'Alamat': k.address,
@@ -299,11 +313,21 @@ export default function KiosPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">
           Data Kios
         </h1>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative ml-auto flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Cari..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+        <div className="flex items-center gap-2">
            <input
             type="file"
             ref={fileInputRef}
@@ -339,7 +363,7 @@ export default function KiosPage() {
               <TableRow>
                  <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={kiosks.length > 0 && selectedKiosks.length === kiosks.length}
+                    checked={filteredKiosks.length > 0 && selectedKiosks.length === filteredKiosks.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
@@ -355,7 +379,7 @@ export default function KiosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {kiosks.map((kiosk) => (
+              {filteredKiosks.map((kiosk) => (
                 <TableRow key={kiosk.id} data-state={selectedKiosks.includes(kiosk.id) && "selected"}>
                    <TableCell>
                     <Checkbox

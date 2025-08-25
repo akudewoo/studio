@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -91,6 +91,7 @@ export default function PembayaranPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -113,13 +114,23 @@ export default function PembayaranPage() {
     loadData();
   }, [toast]);
 
+  const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
+  
+  const filteredPayments = useMemo(() => {
+    if (!searchQuery) return payments;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return payments.filter(payment =>
+      payment.doNumber.toLowerCase().includes(lowercasedQuery) ||
+      getKioskName(payment.kioskId).toLowerCase().includes(lowercasedQuery)
+    );
+  }, [payments, searchQuery, kiosks]);
+
+
   const form = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
     defaultValues: { date: new Date(), doNumber: '', kioskId: '', amount: 0 },
   });
   
-  const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
-
   const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
   const uniqueDistributions = useMemo(() => {
@@ -215,7 +226,7 @@ export default function PembayaranPage() {
   
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedPayments(payments.map(p => p.id));
+      setSelectedPayments(filteredPayments.map(p => p.id));
     } else {
       setSelectedPayments([]);
     }
@@ -230,7 +241,7 @@ export default function PembayaranPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = payments.map(p => ({
+    const dataToExport = filteredPayments.map(p => ({
         'Tanggal': format(new Date(p.date), 'dd/MM/yyyy'),
         'NO DO': p.doNumber,
         'Nama Kios': getKioskName(p.kioskId),
@@ -322,9 +333,19 @@ export default function PembayaranPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pembayaran</h1>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative ml-auto flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Cari..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+        <div className="flex items-center gap-2">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -357,7 +378,7 @@ export default function PembayaranPage() {
               <TableRow>
                  <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={payments.length > 0 && selectedPayments.length === payments.length}
+                    checked={filteredPayments.length > 0 && selectedPayments.length === filteredPayments.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
@@ -370,7 +391,7 @@ export default function PembayaranPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.map((payment) => (
+              {filteredPayments.map((payment) => (
                 <TableRow key={payment.id} data-state={selectedPayments.includes(payment.id) && "selected"}>
                   <TableCell>
                     <Checkbox

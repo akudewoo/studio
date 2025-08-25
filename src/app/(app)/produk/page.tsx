@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 
@@ -49,6 +49,7 @@ export default function ProdukPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +70,14 @@ export default function ProdukPage() {
     }
     loadData();
   }, [toast]);
+  
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery) return products;
+    return products.filter(product =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [products, searchQuery]);
+
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -199,7 +208,7 @@ export default function ProdukPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedProducts(products.map(p => p.id));
+      setSelectedProducts(filteredProducts.map(p => p.id));
     } else {
       setSelectedProducts([]);
     }
@@ -237,7 +246,7 @@ export default function ProdukPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = products.map(p => ({
+    const dataToExport = filteredProducts.map(p => ({
         'Nama Produk': p.name,
         'Harga Beli': p.purchasePrice,
         'Harga Jual': p.sellPrice,
@@ -315,11 +324,21 @@ export default function ProdukPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">
           Daftar Produk
         </h1>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative ml-auto flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Cari..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+        <div className="flex items-center gap-2">
           <input
             type="file"
             ref={fileInputRef}
@@ -356,7 +375,7 @@ export default function ProdukPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={products.length > 0 && selectedProducts.length === products.length}
+                    checked={filteredProducts.length > 0 && selectedProducts.length === filteredProducts.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
@@ -369,7 +388,7 @@ export default function ProdukPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <TableRow key={product.id} data-state={selectedProducts.includes(product.id) && "selected"}>
                   <TableCell>
                     <Checkbox

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -60,6 +60,7 @@ export default function PenyaluranKiosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDist, setEditingDist] = useState<KioskDistribution | null>(null);
   const [selectedDists, setSelectedDists] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,11 +83,8 @@ export default function PenyaluranKiosPage() {
     }
     loadData();
   }, [toast]);
-
-  const form = useForm<z.infer<typeof distributionSchema>>({
-    resolver: zodResolver(distributionSchema),
-    defaultValues: { doNumber: '', date: new Date(), kioskId: '', quantity: 1, directPayment: 0 },
-  });
+  
+  const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
   
   const getDetails = (doNumber: string) => {
     const redemption = redemptions.find(r => r.doNumber === doNumber);
@@ -95,6 +93,22 @@ export default function PenyaluranKiosPage() {
     return { redemption, product, doRelease };
   }
 
+  const filteredDistributions = useMemo(() => {
+    if (!searchQuery) return distributions;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return distributions.filter(dist => {
+      const { product } = getDetails(dist.doNumber);
+      return dist.doNumber.toLowerCase().includes(lowercasedQuery) ||
+             getKioskName(dist.kioskId).toLowerCase().includes(lowercasedQuery) ||
+             (product && product.name.toLowerCase().includes(lowercasedQuery));
+    });
+  }, [distributions, searchQuery, kiosks, redemptions, products]);
+
+  const form = useForm<z.infer<typeof distributionSchema>>({
+    resolver: zodResolver(distributionSchema),
+    defaultValues: { doNumber: '', date: new Date(), kioskId: '', quantity: 1, directPayment: 0 },
+  });
+  
   const productMap = useMemo(() => {
     return products.reduce((map, p) => {
       map[p.id] = p;
@@ -108,8 +122,6 @@ export default function PenyaluranKiosPage() {
       label: `${r.doNumber} (${productMap[r.productId]?.name || 'N/A'})`,
     }));
   }, [redemptions, productMap]);
-  
-  const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
   
   const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
@@ -180,7 +192,7 @@ export default function PenyaluranKiosPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedDists(distributions.map(d => d.id));
+      setSelectedDists(filteredDistributions.map(d => d.id));
     } else {
       setSelectedDists([]);
     }
@@ -195,7 +207,7 @@ export default function PenyaluranKiosPage() {
   };
 
   const handleExport = () => {
-    const dataToExport = distributions.map(dist => {
+    const dataToExport = filteredDistributions.map(dist => {
         const { product } = getDetails(dist.doNumber);
         const total = product ? dist.quantity * product.sellPrice : 0;
         const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
@@ -299,9 +311,19 @@ export default function PenyaluranKiosPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penyaluran Kios</h1>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative ml-auto flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Cari..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+        <div className="flex items-center gap-2">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -334,7 +356,7 @@ export default function PenyaluranKiosPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={distributions.length > 0 && selectedDists.length === distributions.length}
+                    checked={filteredDistributions.length > 0 && selectedDists.length === filteredDistributions.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
@@ -345,7 +367,7 @@ export default function PenyaluranKiosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {distributions.map((dist) => {
+              {filteredDistributions.map((dist) => {
                 const { product } = getDetails(dist.doNumber);
                 const total = product ? dist.quantity * product.sellPrice : 0;
                 const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);

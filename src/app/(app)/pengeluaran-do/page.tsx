@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -57,6 +57,7 @@ export default function PengeluaranDOPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState<DORelease | null>(null);
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,15 +78,6 @@ export default function PengeluaranDOPage() {
     loadData();
   }, [toast]);
 
-  const form = useForm<z.infer<typeof doReleaseSchema>>({
-    resolver: zodResolver(doReleaseSchema),
-    defaultValues: {
-      doNumber: '',
-      date: new Date(),
-      quantity: 1,
-    },
-  });
-
   const redemptionMap = useMemo(() => {
     return redemptions.reduce((map, r) => {
       map[r.doNumber] = r;
@@ -99,6 +91,26 @@ export default function PengeluaranDOPage() {
       return map;
     }, {} as Record<string, Product>);
   }, [products]);
+  
+  const filteredDoReleases = useMemo(() => {
+    if (!searchQuery) return doReleases;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return doReleases.filter(release => {
+      const redemption = redemptionMap[release.doNumber];
+      const product = redemption ? productMap[redemption.productId] : null;
+      return release.doNumber.toLowerCase().includes(lowercasedQuery) ||
+             (product && product.name.toLowerCase().includes(lowercasedQuery));
+    });
+  }, [doReleases, searchQuery, redemptionMap, productMap]);
+
+  const form = useForm<z.infer<typeof doReleaseSchema>>({
+    resolver: zodResolver(doReleaseSchema),
+    defaultValues: {
+      doNumber: '',
+      date: new Date(),
+      quantity: 1,
+    },
+  });
 
   const doOptions = useMemo(() => {
     return redemptions.map(r => ({
@@ -208,7 +220,7 @@ export default function PengeluaranDOPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedReleases(doReleases.map(r => r.id));
+      setSelectedReleases(filteredDoReleases.map(r => r.id));
     } else {
       setSelectedReleases([]);
     }
@@ -223,7 +235,7 @@ export default function PengeluaranDOPage() {
   };
 
   const handleExport = () => {
-    const dataToExport = doReleases.map(r => {
+    const dataToExport = filteredDoReleases.map(r => {
         const redemption = redemptionMap[r.doNumber];
         const product = redemption ? productMap[redemption.productId] : null;
         const sisa = sisaPenebusanByDO[r.doNumber] ?? 0;
@@ -320,9 +332,19 @@ export default function PengeluaranDOPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pengeluaran DO</h1>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative ml-auto flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Cari..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+        <div className="flex items-center gap-2">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -358,7 +380,7 @@ export default function PengeluaranDOPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={doReleases.length > 0 && selectedReleases.length === doReleases.length}
+                    checked={filteredDoReleases.length > 0 && selectedReleases.length === filteredDoReleases.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
@@ -373,7 +395,7 @@ export default function PengeluaranDOPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {doReleases.map((release) => {
+              {filteredDoReleases.map((release) => {
                 const redemption = redemptionMap[release.doNumber];
                 const product = redemption ? productMap[redemption.productId] : null;
                 const sisa = sisaPenebusanByDO[release.doNumber] ?? 0;

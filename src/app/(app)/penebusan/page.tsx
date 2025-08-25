@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { CalendarIcon, PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -52,6 +52,7 @@ export default function PenebusanPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRedemption, setEditingRedemption] = useState<Redemption | null>(null);
   const [selectedRedemptions, setSelectedRedemptions] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +72,23 @@ export default function PenebusanPage() {
     loadData();
   }, [toast]);
 
+  const productMap = useMemo(() => {
+    return products.reduce((map, product) => {
+      map[product.id] = product;
+      return map;
+    }, {} as Record<string, Product>);
+  }, [products]);
+
+  const filteredRedemptions = useMemo(() => {
+    if (!searchQuery) return redemptions;
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return redemptions.filter(redemption =>
+      redemption.doNumber.toLowerCase().includes(lowercasedQuery) ||
+      redemption.supplier.toLowerCase().includes(lowercasedQuery) ||
+      (productMap[redemption.productId]?.name.toLowerCase().includes(lowercasedQuery))
+    );
+  }, [redemptions, searchQuery, productMap]);
+
   const form = useForm<z.infer<typeof redemptionSchema>>({
     resolver: zodResolver(redemptionSchema),
     defaultValues: {
@@ -82,13 +100,6 @@ export default function PenebusanPage() {
     },
   });
 
-  const productMap = useMemo(() => {
-    return products.reduce((map, product) => {
-      map[product.id] = product;
-      return map;
-    }, {} as Record<string, Product>);
-  }, [products]);
-  
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
   };
@@ -182,7 +193,7 @@ export default function PenebusanPage() {
   
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedRedemptions(redemptions.map(r => r.id));
+      setSelectedRedemptions(filteredRedemptions.map(r => r.id));
     } else {
       setSelectedRedemptions([]);
     }
@@ -197,7 +208,7 @@ export default function PenebusanPage() {
   };
   
   const handleExport = () => {
-    const dataToExport = redemptions.map(r => {
+    const dataToExport = filteredRedemptions.map(r => {
         const product = productMap[r.productId];
         const total = product ? product.purchasePrice * r.quantity : 0;
         return {
@@ -298,9 +309,19 @@ export default function PenebusanPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penebusan</h1>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative ml-auto flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Cari..."
+              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+        <div className="flex items-center gap-2">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -336,7 +357,7 @@ export default function PenebusanPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={redemptions.length > 0 && selectedRedemptions.length === redemptions.length}
+                    checked={filteredRedemptions.length > 0 && selectedRedemptions.length === filteredRedemptions.length}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
@@ -351,7 +372,7 @@ export default function PenebusanPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {redemptions.map((redemption) => {
+              {filteredRedemptions.map((redemption) => {
                 const product = productMap[redemption.productId];
                 const total = product ? product.purchasePrice * redemption.quantity : 0;
                 return (
