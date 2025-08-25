@@ -211,7 +211,11 @@ export default function PenyaluranKiosPage() {
     }));
   }, [redemptions, productMap]);
   
-  const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+  const formatCurrency = (value: number) => {
+    const isNegative = value < 0;
+    const formattedValue = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(value));
+    return isNegative ? `(${formattedValue})` : formattedValue;
+  }
 
   const handleDialogOpen = (dist: KioskDistribution | null) => {
     setEditingDist(dist);
@@ -507,7 +511,7 @@ export default function PenyaluranKiosPage() {
                     <TableCell className="text-right">{formatCurrency(total)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(dist.directPayment)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalTempo)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(kurangBayar)}</TableCell>
+                    <TableCell className={cn("text-right", { "text-destructive": kurangBayar > 0 })}>{formatCurrency(kurangBayar)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
