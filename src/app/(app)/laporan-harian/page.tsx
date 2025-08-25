@@ -17,7 +17,7 @@ import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import type { Redemption, DORelease, KioskDistribution, Kiosk, Product } from '@/lib/types';
-import { Whatsapp } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
 
 export default function LaporanHarianPage() {
@@ -172,7 +172,7 @@ export default function LaporanHarianPage() {
               />
             </div>
              <Button onClick={sendToWhatsApp} disabled={!summary || !phoneNumber}>
-              <Whatsapp className="mr-2 h-4 w-4" /> Kirim via WhatsApp
+              <MessageCircle className="mr-2 h-4 w-4" /> Kirim via WhatsApp
             </Button>
           </div>
         </CardContent>
