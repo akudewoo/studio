@@ -175,8 +175,8 @@ export default function ProdukPage() {
     } else {
       // Optimistic addition
       const tempId = `temp-${Date.now()}`;
-      const newProduct optimistic = { id: tempId, ...values };
-      setProducts(prevProducts => [...prevProducts, newProduct_optimistic]);
+      const newProductOptimistic = { id: tempId, ...values };
+      setProducts(prevProducts => [...prevProducts, newProductOptimistic]);
 
       try {
         const newProduct = await addProduct(values);
