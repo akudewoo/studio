@@ -224,7 +224,7 @@ export default function LaporanPage() {
           <tbody>
             <tr><td>SISA TAGIHAN LALU</td><td>${formatCurrency(sisaTagihanLalu)}</td></tr>
             <tr><td>PENJUALAN</td><td>${formatCurrency(penjualanHariIni)}</td></tr>
-            <tr><td class="no-border-bottom"></td><td class="no-border-bottom text-right font-bold">${formatCurrency(totalTagihan)}</td></tr>
+            <tr><td class="font-bold">TOTAL</td><td class="text-right font-bold">${formatCurrency(totalTagihan)}</td></tr>
             <tr><td>PEMBAYARAN</td><td>${formatCurrency(pembayaranHariIni)}</td></tr>
             <tr><td class="font-bold">SISA TAGIHAN HARI INI</td><td class="font-bold">${formatCurrency(sisaTagihanHariIni)}</td></tr>
             <tr><td>SISA PUPUK</td><td>${formatCurrency(sisaPupukValue)}</td></tr>
