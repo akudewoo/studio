@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -66,7 +66,7 @@ export default function PenyaluranKiosPage() {
   const [editingDist, setEditingDist] = useState<KioskDistribution | null>(null);
   const [selectedDists, setSelectedDists] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [groupFilter, setGroupFilter] = useState<{key: 'kioskId' | 'none', value: string}>({key: 'none', value: 'all'});
+  const [groupFilter, setGroupFilter] = useState<{key: 'kioskId' | 'doNumber' | 'none', value: string}>({key: 'none', value: 'all'});
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -177,7 +177,7 @@ export default function PenyaluranKiosPage() {
     setSortConfig({ key, direction });
   };
   
-  const groupingOptions: {key: keyof KioskDistribution, label: string}[] = [
+  const groupingOptions: {key: 'kioskId' | 'doNumber', label: string}[] = [
     { key: 'kioskId', label: 'Nama Kios' },
     { key: 'doNumber', label: 'NO DO'}
   ];
@@ -190,11 +190,32 @@ export default function PenyaluranKiosPage() {
         label: getKioskName(kioskId)
       }));
     }
-    return [...new Set(distributions.map(d => d[groupFilter.key as keyof KioskDistribution]))].map(val => ({
+    return [...new Set(distributions.map(d => d[groupFilter.key as 'doNumber']))].map(val => ({
         value: val,
         label: val
     }));
   }, [distributions, groupFilter.key, kiosks]);
+  
+  const formatCurrency = (value: number) => {
+    const isNegative = value < 0;
+    const formattedValue = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(value));
+    return isNegative ? `(${formattedValue})` : formattedValue;
+  }
+  
+  const summaryData = useMemo(() => {
+    return sortedAndFilteredDistributions.reduce((acc, dist) => {
+        const { product } = getDetails(dist.doNumber);
+        const total = product ? dist.quantity * product.sellPrice : 0;
+        const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
+        const kurangBayar = total - dist.directPayment - totalTempo;
+        
+        acc.totalQty += dist.quantity;
+        if(kurangBayar > 0) {
+            acc.totalOutstanding += kurangBayar;
+        }
+        return acc;
+    }, { totalQty: 0, totalOutstanding: 0 });
+  }, [sortedAndFilteredDistributions, products, redemptions, payments]);
 
   const form = useForm<z.infer<typeof distributionSchema>>({
     resolver: zodResolver(distributionSchema),
@@ -214,12 +235,6 @@ export default function PenyaluranKiosPage() {
       label: `${r.doNumber} (${productMap[r.productId]?.name || 'N/A'})`,
     }));
   }, [redemptions, productMap]);
-  
-  const formatCurrency = (value: number) => {
-    const isNegative = value < 0;
-    const formattedValue = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(value));
-    return isNegative ? `(${formattedValue})` : formattedValue;
-  }
 
   const handleDialogOpen = (dist: KioskDistribution | null) => {
     setEditingDist(dist);
@@ -421,7 +436,7 @@ export default function PenyaluranKiosPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-             <Select onValueChange={(key) => setGroupFilter({ key: key as keyof KioskDistribution, value: 'all' })} value={groupFilter.key}>
+             <Select onValueChange={(key) => setGroupFilter({ key: key as 'kioskId' | 'doNumber' | 'none', value: 'all' })} value={groupFilter.key}>
                 <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Kelompokkan Data" />
                 </SelectTrigger>
@@ -468,9 +483,29 @@ export default function PenyaluranKiosPage() {
           )}
         </div>
       </div>
+       <div className="grid gap-4 sm:grid-cols-2">
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total QTY Penyaluran</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{summaryData.totalQty.toLocaleString('id-ID')}</div>
+                   <p className="text-xs text-muted-foreground">Jumlah semua kuantitas yang disalurkan</p>
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Tagihan Belum Lunas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(summaryData.totalOutstanding)}</div>
+                   <p className="text-xs text-muted-foreground">Jumlah semua tagihan yang belum lunas</p>
+              </CardContent>
+          </Card>
+      </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-220px)]">
+          <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>

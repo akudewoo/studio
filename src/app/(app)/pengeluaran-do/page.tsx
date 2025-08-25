@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -160,6 +160,13 @@ export default function PengeluaranDOPage() {
     }
     setSortConfig({ key, direction });
   };
+
+  const summaryData = useMemo(() => {
+    return sortedAndFilteredDoReleases.reduce((acc, release) => {
+        acc.totalQtyReleased += release.quantity;
+        return acc;
+    }, { totalQtyReleased: 0 });
+  }, [sortedAndFilteredDoReleases]);
 
 
   const form = useForm<z.infer<typeof doReleaseSchema>>({
@@ -424,8 +431,17 @@ export default function PengeluaranDOPage() {
         </div>
       </div>
       <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total QTY Dikeluarkan</CardTitle>
+          </CardHeader>
+          <CardContent>
+              <div className="text-2xl font-bold">{summaryData.totalQtyReleased.toLocaleString('id-ID')}</div>
+              <p className="text-xs text-muted-foreground">Jumlah semua kuantitas DO yang dikeluarkan</p>
+          </CardContent>
+      </Card>
+      <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-220px)]">
+          <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>

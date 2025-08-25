@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -78,6 +78,10 @@ export default function PenebusanPage() {
     }
     loadData();
   }, [toast]);
+  
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+  };
 
   const productMap = useMemo(() => {
     return products.reduce((map, product) => {
@@ -149,6 +153,16 @@ export default function PenebusanPage() {
     return [...new Set(redemptions.map(r => r[groupFilter.key]))];
   }, [redemptions, groupFilter.key]);
 
+  const summaryData = useMemo(() => {
+    return sortedAndFilteredRedemptions.reduce((acc, redemption) => {
+        const product = productMap[redemption.productId];
+        const total = product ? product.purchasePrice * redemption.quantity : 0;
+        acc.totalQty += redemption.quantity;
+        acc.totalValue += total;
+        return acc;
+    }, { totalQty: 0, totalValue: 0 });
+  }, [sortedAndFilteredRedemptions, productMap]);
+
 
   const form = useForm<z.infer<typeof redemptionSchema>>({
     resolver: zodResolver(redemptionSchema),
@@ -160,10 +174,6 @@ export default function PenebusanPage() {
       quantity: 1,
     },
   });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
-  };
 
   const handleDialogOpen = (redemption: Redemption | null) => {
     setEditingRedemption(redemption);
@@ -431,9 +441,29 @@ export default function PenebusanPage() {
           )}
         </div>
       </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total QTY Penebusan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{summaryData.totalQty.toLocaleString('id-ID')}</div>
+                   <p className="text-xs text-muted-foreground">Jumlah semua kuantitas penebusan</p>
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Nilai Penebusan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(summaryData.totalValue)}</div>
+                   <p className="text-xs text-muted-foreground">Jumlah semua nilai penebusan</p>
+              </CardContent>
+          </Card>
+      </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-220px)]">
+          <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>

@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -77,6 +77,10 @@ export default function ProdukPage() {
     loadData();
   }, [toast]);
   
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+  };
+
   const stockByProduct = useMemo(() => {
     const stock: Record<string, number> = {};
     products.forEach(p => {
@@ -152,6 +156,16 @@ export default function ProdukPage() {
     }
     setSortConfig({ key, direction });
   };
+  
+  const summaryData = useMemo(() => {
+    return sortedAndFilteredProducts.reduce((acc, product) => {
+        const stock = stockByProduct[product.id] || 0;
+        acc.totalStock += stock;
+        acc.totalPurchaseValue += stock * product.purchasePrice;
+        acc.totalSellValue += stock * product.sellPrice;
+        return acc;
+    }, { totalStock: 0, totalPurchaseValue: 0, totalSellValue: 0 });
+  }, [sortedAndFilteredProducts, stockByProduct]);
 
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -243,9 +257,6 @@ export default function ProdukPage() {
     setIsDialogOpen(false);
   };
   
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
-  };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -409,9 +420,38 @@ export default function ProdukPage() {
           )}
         </div>
       </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Stok</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{summaryData.totalStock.toLocaleString('id-ID')}</div>
+            <p className="text-xs text-muted-foreground">Jumlah semua stok produk</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Nilai Aset (Beli)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(summaryData.totalPurchaseValue)}</div>
+             <p className="text-xs text-muted-foreground">Total nilai stok berdasarkan harga beli</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Nilai Aset (Jual)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(summaryData.totalSellValue)}</div>
+            <p className="text-xs text-muted-foreground">Total nilai stok berdasarkan harga jual</p>
+          </CardContent>
+        </Card>
+      </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-220px)]">
+          <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>

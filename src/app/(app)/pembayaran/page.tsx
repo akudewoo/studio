@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -120,6 +120,8 @@ export default function PembayaranPage() {
     }
     loadData();
   }, [toast]);
+  
+  const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
   const getKioskName = (kioskId: string) => kiosks.find(k => k.id === kioskId)?.name || 'N/A';
   
@@ -186,13 +188,19 @@ export default function PembayaranPage() {
     return [];
   }, [payments, groupFilter.key, kiosks]);
 
+  const summaryData = useMemo(() => {
+    return sortedAndFilteredPayments.reduce((acc, payment) => {
+        acc.totalPayments += payment.amount;
+        return acc;
+    }, { totalPayments: 0 });
+  }, [sortedAndFilteredPayments]);
+
 
   const form = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
     defaultValues: { date: new Date(), doNumber: '', kioskId: '', amount: 0 },
   });
   
-  const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
   const uniqueDistributions = useMemo(() => {
     const seen = new Set<string>();
@@ -453,8 +461,17 @@ export default function PembayaranPage() {
         </div>
       </div>
       <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Pembayaran Diterima</CardTitle>
+          </CardHeader>
+          <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(summaryData.totalPayments)}</div>
+              <p className="text-xs text-muted-foreground">Jumlah semua pembayaran tempo yang diterima</p>
+          </CardContent>
+      </Card>
+      <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-220px)]">
+          <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>

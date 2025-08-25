@@ -8,7 +8,7 @@ import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download, Search, Arr
 import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -175,6 +175,14 @@ export default function KiosPage() {
     if (groupFilter.key === 'none') return [];
     return [...new Set(kiosks.map(k => k[groupFilter.key]))];
   }, [kiosks, groupFilter.key]);
+
+  const summaryData = useMemo(() => {
+    return sortedAndFilteredKiosks.reduce((acc, kiosk) => {
+        acc.totalKiosks += 1;
+        acc.totalBill += totalBills[kiosk.id] || 0;
+        return acc;
+    }, { totalKiosks: 0, totalBill: 0 });
+  }, [sortedAndFilteredKiosks, totalBills]);
 
 
   const form = useForm<z.infer<typeof kioskSchema>>({
@@ -435,9 +443,29 @@ export default function KiosPage() {
           )}
         </div>
       </div>
+       <div className="grid gap-4 sm:grid-cols-2">
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Kios</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{summaryData.totalKiosks}</div>
+                  <p className="text-xs text-muted-foreground">Jumlah total kios terdaftar</p>
+              </CardContent>
+          </Card>
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Tagihan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(summaryData.totalBill)}</div>
+                  <p className="text-xs text-muted-foreground">Jumlah semua tagihan kios</p>
+              </CardContent>
+          </Card>
+      </div>
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-220px)]">
+          <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
