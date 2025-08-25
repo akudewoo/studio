@@ -78,28 +78,34 @@ export default function ProdukPage() {
 
   const stockByProduct = useMemo(() => {
     const stock: Record<string, number> = {};
-
-    const releasedQtyByDO: Record<string, number> = {};
-    doReleases.forEach(release => {
-      if (!releasedQtyByDO[release.doNumber]) {
-        releasedQtyByDO[release.doNumber] = 0;
-      }
-      releasedQtyByDO[release.doNumber] += release.quantity;
-    });
-
     products.forEach(p => {
         stock[p.id] = 0;
     });
 
+    const redeemedQtyByDO: Record<string, {productId: string, quantity: number}> = {};
     redemptions.forEach(redemption => {
-        const totalRedeemed = redemption.quantity;
-        const totalReleased = releasedQtyByDO[redemption.doNumber] || 0;
+        redeemedQtyByDO[redemption.doNumber] = {
+            productId: redemption.productId,
+            quantity: (redeemedQtyByDO[redemption.doNumber]?.quantity || 0) + redemption.quantity
+        };
+    });
+
+    const releasedQtyByDO: Record<string, number> = {};
+    doReleases.forEach(release => {
+        releasedQtyByDO[release.doNumber] = (releasedQtyByDO[release.doNumber] || 0) + release.quantity;
+    });
+
+    Object.keys(redeemedQtyByDO).forEach(doNumber => {
+        const { productId, quantity: totalRedeemed } = redeemedQtyByDO[doNumber];
+        const totalReleased = releasedQtyByDO[doNumber] || 0;
         const remainingStock = totalRedeemed - totalReleased;
-        stock[redemption.productId] = (stock[redemption.productId] || 0) + remainingStock;
+        if (stock[productId] !== undefined) {
+            stock[productId] += remainingStock;
+        }
     });
     
     return stock;
-  }, [products, redemptions, doReleases]);
+}, [products, redemptions, doReleases]);
 
 
   const handleDialogOpen = (product: Product | null) => {
