@@ -275,19 +275,19 @@ export default function PembayaranPage() {
 
                 const paymentData = {
                     date: excelDate,
-                    doNumber: item['NO DO'],
+                    doNumber: String(item['NO DO']),
                     kioskId: kioskId,
                     amount: item['Total Bayar'],
                 };
                 
-                const parsed = paymentSchema.safeParse(paymentData);
+                const parsed = paymentSchema.strip().safeParse(paymentData);
                 if (parsed.success) {
                     newPayments.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
                     });
                 } else {
-                    console.warn('Invalid item skipped:', parsed.error);
+                    console.warn('Invalid item skipped:', item, parsed.error);
                 }
             }
 

@@ -254,27 +254,29 @@ export default function PengeluaranDOPage() {
             const newReleases: DOReleaseInput[] = [];
             for (const item of json) {
                 const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
-                const redemption = redemptionMap[item['NO DO']];
+                const doNumber = String(item['NO DO']);
+                const redemption = redemptionMap[doNumber];
                 if (!redemption) {
-                  console.warn(`Redemption not found for DO: ${item['NO DO']}`);
+                  console.warn(`Redemption not found for DO: ${doNumber}`);
                   continue;
                 }
 
                 const releaseData = {
-                    doNumber: item['NO DO'],
+                    doNumber: doNumber,
                     date: excelDate,
                     quantity: item['QTY DO'],
-                    redemptionQuantity: redemption.quantity,
+                    redemptionQuantity: redemption.quantity, // Get from existing redemption
                 };
                 
-                const parsed = doReleaseImportSchema.safeParse(releaseData);
+                const parsed = doReleaseSchema.strip().safeParse(releaseData);
                 if (parsed.success) {
                     newReleases.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
+                      redemptionQuantity: redemption.quantity,
                     });
                 } else {
-                    console.warn('Invalid item skipped:', parsed.error);
+                    console.warn('Invalid item skipped:', item, parsed.error);
                 }
             }
 

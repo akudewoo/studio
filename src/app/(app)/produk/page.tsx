@@ -274,11 +274,11 @@ export default function ProdukPage() {
                     sellPrice: item['Harga Jual'],
                 };
                 
-                const parsed = productSchema.safeParse(productData);
+                const parsed = productSchema.strip().safeParse(productData);
                 if (parsed.success) {
                     newProducts.push(parsed.data);
                 } else {
-                    console.warn('Invalid item skipped:', parsed.error);
+                    console.warn('Invalid item skipped:', item, parsed.error);
                 }
             }
 

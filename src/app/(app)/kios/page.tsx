@@ -253,17 +253,17 @@ export default function KiosPage() {
                 const kioskData = {
                     name: item['Nama Kios'],
                     address: item['Alamat'],
-                    phone: item['No. Telepon'],
+                    phone: String(item['No. Telepon']),
                     desa: item['Desa'],
                     kecamatan: item['Kecamatan'],
                     penanggungJawab: item['Penanggung Jawab'],
                 };
                 
-                const parsed = kioskSchema.safeParse(kioskData);
+                const parsed = kioskSchema.strip().safeParse(kioskData);
                 if (parsed.success) {
                     newKiosks.push(parsed.data);
                 } else {
-                    console.warn('Invalid item skipped:', parsed.error);
+                    console.warn('Invalid item skipped:', item, parsed.error);
                 }
             }
 

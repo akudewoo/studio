@@ -247,21 +247,21 @@ export default function PenebusanPage() {
                 }
 
                 const redemptionData = {
-                    doNumber: item['NO DO'],
+                    doNumber: String(item['NO DO']),
                     supplier: item['Supplier'],
                     date: excelDate,
                     productId: productId,
                     quantity: item['QTY'],
                 };
                 
-                const parsed = redemptionSchema.safeParse(redemptionData);
+                const parsed = redemptionSchema.strip().safeParse(redemptionData);
                 if (parsed.success) {
                     newRedemptions.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
                     });
                 } else {
-                    console.warn('Invalid item skipped:', parsed.error);
+                    console.warn('Invalid item skipped:', item, parsed.error);
                 }
             }
 

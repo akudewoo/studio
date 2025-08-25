@@ -234,21 +234,21 @@ export default function PenyaluranKiosPage() {
                 }
 
                 const distData = {
-                    doNumber: item['NO DO'],
+                    doNumber: String(item['NO DO']),
                     date: excelDate,
                     kioskId: kioskId,
                     quantity: item['QTY'],
                     directPayment: item['Dibayar Langsung'] || 0,
                 };
                 
-                const parsed = distributionSchema.safeParse(distData);
+                const parsed = distributionSchema.strip().safeParse(distData);
                 if (parsed.success) {
                     newDistributions.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
                     });
                 } else {
-                    console.warn('Invalid item skipped:', parsed.error);
+                    console.warn('Invalid item skipped:', item, parsed.error);
                 }
             }
 
