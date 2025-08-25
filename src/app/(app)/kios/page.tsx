@@ -8,6 +8,7 @@ import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -28,7 +29,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Kiosk, KioskDistribution, Payment, Product, Redemption } from '@/lib/types';
-import { getKiosks, addKiosk, updateKiosk, deleteKiosk } from '@/services/kioskService';
+import { getKiosks, addKiosk, updateKiosk, deleteKiosk, deleteMultipleKiosks } from '@/services/kioskService';
 import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getPayments } from '@/services/paymentService';
 import { getProducts } from '@/services/productService';
@@ -52,6 +53,7 @@ export default function KiosPage() {
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingKiosk, setEditingKiosk] = useState<Kiosk | null>(null);
+  const [selectedKiosks, setSelectedKiosks] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -145,6 +147,25 @@ export default function KiosPage() {
       });
     }
   };
+  
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMultipleKiosks(selectedKiosks);
+      setKiosks(kiosks.filter(k => !selectedKiosks.includes(k.id)));
+      setSelectedKiosks([]);
+      toast({
+        title: 'Sukses',
+        description: `${selectedKiosks.length} kios berhasil dihapus.`,
+      });
+    } catch (error) {
+       toast({
+        title: 'Error',
+        description: 'Gagal menghapus kios terpilih.',
+        variant: 'destructive',
+      });
+    }
+  };
+
 
   const onSubmit = async (values: z.infer<typeof kioskSchema>) => {
     try {
@@ -175,6 +196,22 @@ export default function KiosPage() {
       });
     }
   };
+  
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedKiosks(kiosks.map(k => k.id));
+    } else {
+      setSelectedKiosks([]);
+    }
+  };
+
+  const handleSelectKiosk = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedKiosks([...selectedKiosks, id]);
+    } else {
+      setSelectedKiosks(selectedKiosks.filter(kid => kid !== id));
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -183,10 +220,17 @@ export default function KiosPage() {
           Data Kios
         </h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" onClick={() => handleDialogOpen(null)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Tambah Kios
-          </Button>
+           {selectedKiosks.length > 0 ? (
+            <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Hapus ({selectedKiosks.length})
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => handleDialogOpen(null)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Tambah Kios
+            </Button>
+          )}
         </div>
       </div>
       <Card>
@@ -194,6 +238,13 @@ export default function KiosPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                 <TableHead className="w-[50px]">
+                   <Checkbox
+                    checked={kiosks.length > 0 && selectedKiosks.length === kiosks.length}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    aria-label="Pilih semua"
+                  />
+                </TableHead>
                 <TableHead>Nama Kios</TableHead>
                 <TableHead>Penanggung Jawab</TableHead>
                 <TableHead>Alamat</TableHead>
@@ -206,7 +257,14 @@ export default function KiosPage() {
             </TableHeader>
             <TableBody>
               {kiosks.map((kiosk) => (
-                <TableRow key={kiosk.id}>
+                <TableRow key={kiosk.id} data-state={selectedKiosks.includes(kiosk.id) && "selected"}>
+                   <TableCell>
+                    <Checkbox
+                      checked={selectedKiosks.includes(kiosk.id)}
+                      onCheckedChange={(checked) => handleSelectKiosk(kiosk.id, !!checked)}
+                      aria-label={`Pilih ${kiosk.name}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{kiosk.name}</TableCell>
                   <TableCell>{kiosk.penanggungJawab}</TableCell>
                   <TableCell>{kiosk.address}</TableCell>

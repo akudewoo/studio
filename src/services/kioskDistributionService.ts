@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { KioskDistribution, KioskDistributionInput } from '@/lib/types';
 
@@ -22,4 +22,13 @@ export async function updateKioskDistribution(id: string, distribution: Partial<
 export async function deleteKioskDistribution(id: string): Promise<void> {
     const distributionDoc = doc(db, 'kioskDistributions', id);
     await deleteDoc(distributionDoc);
+}
+
+export async function deleteMultipleKioskDistributions(ids: string[]): Promise<void> {
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+        const distributionDoc = doc(db, 'kioskDistributions', id);
+        batch.delete(distributionDoc);
+    });
+    await batch.commit();
 }

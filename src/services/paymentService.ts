@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Payment, PaymentInput } from '@/lib/types';
 
@@ -22,4 +22,13 @@ export async function updatePayment(id: string, payment: Partial<Payment>): Prom
 export async function deletePayment(id: string): Promise<void> {
     const paymentDoc = doc(db, 'payments', id);
     await deleteDoc(paymentDoc);
+}
+
+export async function deleteMultiplePayments(ids: string[]): Promise<void> {
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+        const paymentDoc = doc(db, 'payments', id);
+        batch.delete(paymentDoc);
+    });
+    await batch.commit();
 }

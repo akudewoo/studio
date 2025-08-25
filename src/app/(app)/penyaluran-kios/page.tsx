@@ -10,6 +10,7 @@ import { id } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -32,7 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { KioskDistribution, Kiosk, Product, Redemption, Payment, DORelease } from '@/lib/types';
-import { getKioskDistributions, addKioskDistribution, updateKioskDistribution, deleteKioskDistribution } from '@/services/kioskDistributionService';
+import { getKioskDistributions, addKioskDistribution, updateKioskDistribution, deleteKioskDistribution, deleteMultipleKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
@@ -57,6 +58,7 @@ export default function PenyaluranKiosPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDist, setEditingDist] = useState<KioskDistribution | null>(null);
+  const [selectedDists, setSelectedDists] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -112,6 +114,25 @@ export default function PenyaluranKiosPage() {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMultipleKioskDistributions(selectedDists);
+      setDistributions(distributions.filter(d => !selectedDists.includes(d.id)));
+      setSelectedDists([]);
+      toast({
+        title: 'Sukses',
+        description: `${selectedDists.length} penyaluran berhasil dihapus.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menghapus penyaluran terpilih.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+
   const onSubmit = async (values: z.infer<typeof distributionSchema>) => {
     const { doRelease } = getDetails(values.doNumber);
     const distributedQty = distributions.filter(d => d.doNumber === values.doNumber).reduce((sum, d) => sum + d.quantity, 0);
@@ -141,12 +162,36 @@ export default function PenyaluranKiosPage() {
     }
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedDists(distributions.map(d => d.id));
+    } else {
+      setSelectedDists([]);
+    }
+  };
+
+  const handleSelectDist = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedDists([...selectedDists, id]);
+    } else {
+      setSelectedDists(selectedDists.filter(did => did !== id));
+    }
+  };
+
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penyaluran Kios</h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" onClick={() => handleDialogOpen(null)}><PlusCircle className="mr-2 h-4 w-4" />Tambah Penyaluran</Button>
+          {selectedDists.length > 0 ? (
+            <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Hapus ({selectedDists.length})
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => handleDialogOpen(null)}><PlusCircle className="mr-2 h-4 w-4" />Tambah Penyaluran</Button>
+          )}
         </div>
       </div>
       <Card>
@@ -154,6 +199,13 @@ export default function PenyaluranKiosPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                   <Checkbox
+                    checked={distributions.length > 0 && selectedDists.length === distributions.length}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    aria-label="Pilih semua"
+                  />
+                </TableHead>
                 <TableHead>NO DO</TableHead><TableHead>Tanggal</TableHead><TableHead>Nama Produk</TableHead>
                 <TableHead>Nama Kios</TableHead><TableHead className="text-right">QTY</TableHead><TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Kurang Bayar</TableHead><TableHead className="w-[50px]"></TableHead>
@@ -167,7 +219,14 @@ export default function PenyaluranKiosPage() {
                 const kurangBayar = total - dist.directPayment - totalTempo;
 
                 return (
-                  <TableRow key={dist.id}>
+                  <TableRow key={dist.id} data-state={selectedDists.includes(dist.id) && "selected"}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedDists.includes(dist.id)}
+                        onCheckedChange={(checked) => handleSelectDist(dist.id, !!checked)}
+                        aria-label={`Pilih ${dist.doNumber}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{dist.doNumber}</TableCell>
                     <TableCell>{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'N/A'}</TableCell>

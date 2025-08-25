@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Redemption, RedemptionInput } from '@/lib/types';
 
@@ -22,4 +22,13 @@ export async function updateRedemption(id: string, redemption: Partial<Redemptio
 export async function deleteRedemption(id: string): Promise<void> {
     const redemptionDoc = doc(db, 'redemptions', id);
     await deleteDoc(redemptionDoc);
+}
+
+export async function deleteMultipleRedemptions(ids: string[]): Promise<void> {
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+        const redemptionDoc = doc(db, 'redemptions', id);
+        batch.delete(redemptionDoc);
+    });
+    await batch.commit();
 }

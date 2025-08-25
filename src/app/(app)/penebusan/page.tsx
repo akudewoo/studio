@@ -10,6 +10,7 @@ import { id } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -33,7 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { Redemption, Product } from '@/lib/types';
-import { getRedemptions, addRedemption, updateRedemption, deleteRedemption } from '@/services/redemptionService';
+import { getRedemptions, addRedemption, updateRedemption, deleteRedemption, deleteMultipleRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +51,7 @@ export default function PenebusanPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRedemption, setEditingRedemption] = useState<Redemption | null>(null);
+  const [selectedRedemptions, setSelectedRedemptions] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -126,6 +128,24 @@ export default function PenebusanPage() {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMultipleRedemptions(selectedRedemptions);
+      setRedemptions(redemptions.filter(r => !selectedRedemptions.includes(r.id)));
+      setSelectedRedemptions([]);
+       toast({
+        title: 'Sukses',
+        description: `${selectedRedemptions.length} penebusan berhasil dihapus.`,
+      });
+    } catch (error) {
+       toast({
+        title: 'Error',
+        description: 'Gagal menghapus penebusan terpilih.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof redemptionSchema>) => {
     const redemptionData = { ...values, date: values.date.toISOString() };
     try {
@@ -158,16 +178,40 @@ export default function PenebusanPage() {
       });
     }
   };
+  
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedRedemptions(redemptions.map(r => r.id));
+    } else {
+      setSelectedRedemptions([]);
+    }
+  };
+
+  const handleSelectRedemption = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedRedemptions([...selectedRedemptions, id]);
+    } else {
+      setSelectedRedemptions(selectedRedemptions.filter(rid => rid !== id));
+    }
+  };
+
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Penebusan</h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" onClick={() => handleDialogOpen(null)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Tambah Penebusan
-          </Button>
+          {selectedRedemptions.length > 0 ? (
+            <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Hapus ({selectedRedemptions.length})
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => handleDialogOpen(null)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Tambah Penebusan
+            </Button>
+          )}
         </div>
       </div>
       <Card>
@@ -175,6 +219,13 @@ export default function PenebusanPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                   <Checkbox
+                    checked={redemptions.length > 0 && selectedRedemptions.length === redemptions.length}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    aria-label="Pilih semua"
+                  />
+                </TableHead>
                 <TableHead>NO DO</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead>Tanggal</TableHead>
@@ -189,7 +240,14 @@ export default function PenebusanPage() {
                 const product = productMap[redemption.productId];
                 const total = product ? product.purchasePrice * redemption.quantity : 0;
                 return (
-                  <TableRow key={redemption.id}>
+                  <TableRow key={redemption.id} data-state={selectedRedemptions.includes(redemption.id) && "selected"}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedRedemptions.includes(redemption.id)}
+                        onCheckedChange={(checked) => handleSelectRedemption(redemption.id, !!checked)}
+                        aria-label={`Pilih ${redemption.doNumber}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{redemption.doNumber}</TableCell>
                     <TableCell>{redemption.supplier}</TableCell>
                     <TableCell>{format(new Date(redemption.date), 'dd/MM/yyyy')}</TableCell>

@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Kiosk, KioskInput } from '@/lib/types';
 
@@ -22,4 +22,13 @@ export async function updateKiosk(id: string, kiosk: Partial<Kiosk>): Promise<vo
 export async function deleteKiosk(id: string): Promise<void> {
     const kioskDoc = doc(db, 'kiosks', id);
     await deleteDoc(kioskDoc);
+}
+
+export async function deleteMultipleKiosks(ids: string[]): Promise<void> {
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+        const kioskDoc = doc(db, 'kiosks', id);
+        batch.delete(kioskDoc);
+    });
+    await batch.commit();
 }

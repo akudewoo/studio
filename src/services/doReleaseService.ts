@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { DORelease, DOReleaseInput } from '@/lib/types';
 
@@ -22,4 +22,13 @@ export async function updateDORelease(id: string, doRelease: Partial<DORelease>)
 export async function deleteDORelease(id: string): Promise<void> {
     const doReleaseDoc = doc(db, 'doReleases', id);
     await deleteDoc(doReleaseDoc);
+}
+
+export async function deleteMultipleDOReleases(ids: string[]): Promise<void> {
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+        const doReleaseDoc = doc(db, 'doReleases', id);
+        batch.delete(doReleaseDoc);
+    });
+    await batch.commit();
 }

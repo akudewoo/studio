@@ -10,6 +10,7 @@ import { id } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -32,7 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { Payment, Kiosk, KioskDistribution, Product, Redemption } from '@/lib/types';
-import { getPayments, addPayment, updatePayment, deletePayment } from '@/services/paymentService';
+import { getPayments, addPayment, updatePayment, deletePayment, deleteMultiplePayments } from '@/services/paymentService';
 import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
@@ -89,6 +90,7 @@ export default function PembayaranPage() {
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -148,6 +150,24 @@ export default function PembayaranPage() {
       toast({ title: 'Error', description: 'Gagal menghapus pembayaran.', variant: 'destructive' });
     }
   };
+  
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMultiplePayments(selectedPayments);
+      setPayments(payments.filter(p => !selectedPayments.includes(p.id)));
+      setSelectedPayments([]);
+      toast({
+        title: 'Sukses',
+        description: `${selectedPayments.length} pembayaran berhasil dihapus.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menghapus pembayaran terpilih.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
     try {
@@ -191,13 +211,36 @@ export default function PembayaranPage() {
       form.setValue('amount', outstandingBalance);
     }
   };
+  
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedPayments(payments.map(p => p.id));
+    } else {
+      setSelectedPayments([]);
+    }
+  };
+
+  const handleSelectPayment = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedPayments([...selectedPayments, id]);
+    } else {
+      setSelectedPayments(selectedPayments.filter(pid => pid !== id));
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pembayaran</h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" onClick={() => handleDialogOpen(null)}><PlusCircle className="mr-2 h-4 w-4" />Tambah Pembayaran</Button>
+          {selectedPayments.length > 0 ? (
+            <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Hapus ({selectedPayments.length})
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => handleDialogOpen(null)}><PlusCircle className="mr-2 h-4 w-4" />Tambah Pembayaran</Button>
+          )}
         </div>
       </div>
       <Card>
@@ -205,6 +248,13 @@ export default function PembayaranPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                 <TableHead className="w-[50px]">
+                   <Checkbox
+                    checked={payments.length > 0 && selectedPayments.length === payments.length}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    aria-label="Pilih semua"
+                  />
+                </TableHead>
                 <TableHead>Tanggal</TableHead>
                 <TableHead>NO DO</TableHead>
                 <TableHead>Nama Kios</TableHead>
@@ -214,7 +264,14 @@ export default function PembayaranPage() {
             </TableHeader>
             <TableBody>
               {payments.map((payment) => (
-                <TableRow key={payment.id}>
+                <TableRow key={payment.id} data-state={selectedPayments.includes(payment.id) && "selected"}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedPayments.includes(payment.id)}
+                      onCheckedChange={(checked) => handleSelectPayment(payment.id, !!checked)}
+                      aria-label={`Pilih pembayaran ${payment.id}`}
+                    />
+                  </TableCell>
                   <TableCell>{format(new Date(payment.date), 'dd/MM/yyyy')}</TableCell>
                   <TableCell className="font-medium">{payment.doNumber}</TableCell>
                   <TableCell>{getKioskName(payment.kioskId)}</TableCell>

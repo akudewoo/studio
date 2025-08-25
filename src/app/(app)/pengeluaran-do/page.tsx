@@ -10,6 +10,7 @@ import { id } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -32,7 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { DORelease, Redemption, Product } from '@/lib/types';
-import { getDOReleases, addDORelease, updateDORelease, deleteDORelease } from '@/services/doReleaseService';
+import { getDOReleases, addDORelease, updateDORelease, deleteDORelease, deleteMultipleDOReleases } from '@/services/doReleaseService';
 import { getRedemptions } from '@/services/redemptionService';
 import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,7 @@ export default function PengeluaranDOPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState<DORelease | null>(null);
+  const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -125,6 +127,25 @@ export default function PengeluaranDOPage() {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMultipleDOReleases(selectedReleases);
+      setDoReleases(doReleases.filter(r => !selectedReleases.includes(r.id)));
+      setSelectedReleases([]);
+      toast({
+        title: 'Sukses',
+        description: `${selectedReleases.length} pengeluaran DO berhasil dihapus.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menghapus pengeluaran DO terpilih.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+
   const onSubmit = async (values: z.infer<typeof doReleaseSchema>) => {
     const redemption = redemptionMap[values.doNumber];
     if (!redemption) {
@@ -171,16 +192,39 @@ export default function PengeluaranDOPage() {
       return sisa;
   }, [doReleases, redemptions]);
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedReleases(doReleases.map(r => r.id));
+    } else {
+      setSelectedReleases([]);
+    }
+  };
+
+  const handleSelectRelease = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedReleases([...selectedReleases, id]);
+    } else {
+      setSelectedReleases(selectedReleases.filter(rid => rid !== id));
+    }
+  };
+
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <div className="flex items-center">
         <h1 className="font-headline text-lg font-semibold md:text-2xl">Pengeluaran DO</h1>
         <div className="ml-auto flex items-center gap-2">
+          {selectedReleases.length > 0 ? (
+            <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Hapus ({selectedReleases.length})
+            </Button>
+          ) : (
           <Button size="sm" onClick={() => handleDialogOpen(null)}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Tambah Pengeluaran
           </Button>
+          )}
         </div>
       </div>
       <Card>
@@ -188,6 +232,13 @@ export default function PengeluaranDOPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                   <Checkbox
+                    checked={doReleases.length > 0 && selectedReleases.length === doReleases.length}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    aria-label="Pilih semua"
+                  />
+                </TableHead>
                 <TableHead>NO DO</TableHead>
                 <TableHead>Tanggal</TableHead>
                 <TableHead>Nama Produk</TableHead>
@@ -204,7 +255,14 @@ export default function PengeluaranDOPage() {
                 const sisa = sisaPenebusanByDO[release.doNumber] ?? 0;
 
                 return (
-                  <TableRow key={release.id}>
+                  <TableRow key={release.id} data-state={selectedReleases.includes(release.id) && "selected"}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedReleases.includes(release.id)}
+                        onCheckedChange={(checked) => handleSelectRelease(release.id, !!checked)}
+                        aria-label={`Pilih ${release.doNumber}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{release.doNumber}</TableCell>
                     <TableCell>{format(new Date(release.date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{product?.name || 'N/A'}</TableCell>
