@@ -166,7 +166,8 @@ export default function KiosPage() {
     setSortConfig({ key, direction });
   };
   
-  const groupingOptions: {key: keyof Kiosk, label: string}[] = [
+  const groupingOptions: {key: keyof Kiosk | 'none', label: string}[] = [
+    { key: 'none', label: 'Tidak Dikelompokkan' },
     { key: 'kecamatan', label: 'Kecamatan' },
     { key: 'desa', label: 'Desa' },
   ];
@@ -393,12 +394,11 @@ export default function KiosPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Select onValueChange={(key) => setGroupFilter({ key: key as keyof Kiosk, value: 'all' })} value={groupFilter.key}>
+            <Select onValueChange={(key) => setGroupFilter({ key: key as keyof Kiosk | 'none', value: 'all' })} value={groupFilter.key}>
                 <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Kelompokkan Data" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="none">Tidak Dikelompokkan</SelectItem>
                     {groupingOptions.map(opt => <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>)}
                 </SelectContent>
             </Select>
@@ -409,7 +409,7 @@ export default function KiosPage() {
                   </SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">Semua</SelectItem>
-                      {uniqueGroupValues.map(val => <SelectItem key={val} value={val}>{val}</SelectItem>)}
+                      {uniqueGroupValues.map(val => <SelectItem key={val as string} value={val as string}>{val as string}</SelectItem>)}
                   </SelectContent>
               </Select>
             )}

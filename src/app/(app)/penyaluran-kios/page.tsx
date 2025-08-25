@@ -177,7 +177,8 @@ export default function PenyaluranKiosPage() {
     setSortConfig({ key, direction });
   };
   
-  const groupingOptions: {key: 'kioskId' | 'doNumber', label: string}[] = [
+  const groupingOptions: {key: 'kioskId' | 'doNumber' | 'none', label: string}[] = [
+    { key: 'none', label: 'Tidak Dikelompokkan' },
     { key: 'kioskId', label: 'Nama Kios' },
     { key: 'doNumber', label: 'NO DO'}
   ];
@@ -441,7 +442,6 @@ export default function PenyaluranKiosPage() {
                     <SelectValue placeholder="Kelompokkan Data" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="none">Tidak Dikelompokkan</SelectItem>
                     {groupingOptions.map(opt => <SelectItem key={opt.key} value={opt.key}>{opt.label}</SelectItem>)}
                 </SelectContent>
             </Select>
