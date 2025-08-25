@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Upload, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,8 +30,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, Redemption, DORelease } from '@/lib/types';
-import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultipleProducts } from '@/services/productService';
+import type { Product, Redemption, DORelease, ProductInput } from '@/lib/types';
+import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultipleProducts, addMultipleProducts } from '@/services/productService';
 import { getRedemptions } from '@/services/redemptionService';
 import { getDOReleases } from '@/services/doReleaseService';
 
@@ -48,6 +50,7 @@ export default function ProdukPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -82,32 +85,27 @@ export default function ProdukPage() {
         stock[p.id] = 0;
     });
 
-    const redeemedQtyByDO: Record<string, {productId: string, quantity: number}> = {};
+    const redeemedQtyByProduct: Record<string, number> = {};
     redemptions.forEach(redemption => {
-        if (!redeemedQtyByDO[redemption.doNumber]) {
-            redeemedQtyByDO[redemption.doNumber] = { productId: redemption.productId, quantity: 0 };
-        }
-        redeemedQtyByDO[redemption.doNumber].quantity += redemption.quantity;
-    });
-
-    const releasedQtyByDO: Record<string, number> = {};
-    doReleases.forEach(release => {
-        releasedQtyByDO[release.doNumber] = (releasedQtyByDO[release.doNumber] || 0) + release.quantity;
+        redeemedQtyByProduct[redemption.productId] = (redeemedQtyByProduct[redemption.productId] || 0) + redemption.quantity;
     });
     
-    products.forEach(p => {
-        stock[p.id] = 0;
-        const productRedemptions = redemptions.filter(r => r.productId === p.id);
-        let totalRedeemed = 0;
-        productRedemptions.forEach(r => {
-            totalRedeemed += r.quantity;
-        });
+    const releasedQtyByProduct: Record<string, number> = {};
+    const redemptionProductMap = redemptions.reduce((map, r) => {
+        map[r.doNumber] = r.productId;
+        return map;
+    }, {} as Record<string, string>);
 
-        let totalReleased = 0;
-        const productDOReleases = doReleases.filter(dr => productRedemptions.some(r => r.doNumber === dr.doNumber));
-        productDOReleases.forEach(dr => {
-            totalReleased += dr.quantity;
-        });
+    doReleases.forEach(release => {
+        const productId = redemptionProductMap[release.doNumber];
+        if (productId) {
+            releasedQtyByProduct[productId] = (releasedQtyByProduct[productId] || 0) + release.quantity;
+        }
+    });
+
+    products.forEach(p => {
+        const totalRedeemed = redeemedQtyByProduct[p.id] || 0;
+        const totalReleased = releasedQtyByProduct[p.id] || 0;
         stock[p.id] = totalRedeemed - totalReleased;
     });
     
@@ -173,21 +171,18 @@ export default function ProdukPage() {
         setEditingProduct(null);
       }
     } else {
-      // Optimistic addition
       const tempId = `temp-${Date.now()}`;
-      const newProductOptimistic = { id: tempId, ...values };
+      const newProductOptimistic: Product = { id: tempId, ...values };
       setProducts(prevProducts => [...prevProducts, newProductOptimistic]);
 
       try {
         const newProduct = await addProduct(values);
-        // Replace temporary product with the real one from the server
         setProducts(prevProducts => prevProducts.map(p => p.id === tempId ? newProduct : p));
         toast({
           title: 'Sukses',
           description: 'Produk baru berhasil ditambahkan.',
         });
       } catch (error) {
-        // Revert optimistic update
         setProducts(prevProducts => prevProducts.filter(p => p.id !== tempId));
         toast({
           title: 'Error',
@@ -240,6 +235,83 @@ export default function ProdukPage() {
       });
     }
   };
+  
+  const handleExport = () => {
+    const dataToExport = products.map(p => ({
+        'Nama Produk': p.name,
+        'Harga Beli': p.purchasePrice,
+        'Harga Jual': p.sellPrice,
+        'Stok': stockByProduct[p.id] || 0
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Produk");
+    XLSX.writeFile(workbook, "DataProduk.xlsx");
+     toast({
+        title: 'Sukses',
+        description: 'Data produk berhasil diekspor.',
+      });
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+            const newProducts: ProductInput[] = [];
+            for (const item of json) {
+                const productData = {
+                    name: item['Nama Produk'],
+                    purchasePrice: item['Harga Beli'],
+                    sellPrice: item['Harga Jual'],
+                };
+                
+                const parsed = productSchema.safeParse(productData);
+                if (parsed.success) {
+                    newProducts.push(parsed.data);
+                } else {
+                    console.warn('Invalid item skipped:', parsed.error);
+                }
+            }
+
+            if (newProducts.length > 0) {
+                const addedProducts = await addMultipleProducts(newProducts);
+                setProducts(prev => [...prev, ...addedProducts]);
+                toast({
+                    title: 'Sukses',
+                    description: `${addedProducts.length} produk berhasil diimpor.`,
+                });
+            } else {
+                 toast({
+                    title: 'Tidak Ada Data',
+                    description: 'Tidak ada data produk yang valid untuk diimpor.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'Gagal mengimpor file. Pastikan format file benar.',
+                variant: 'destructive',
+            });
+        } finally {
+            // Reset file input
+            if(fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -248,6 +320,22 @@ export default function ProdukPage() {
           Daftar Produk
         </h1>
         <div className="ml-auto flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept=".xlsx, .xls, .csv"
+            onChange={handleImport}
+          />
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" />
+              Impor
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Ekspor
+          </Button>
+
           {selectedProducts.length > 0 ? (
             <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
               <Trash2 className="mr-2 h-4 w-4" />

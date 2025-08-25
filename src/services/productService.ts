@@ -1,12 +1,24 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Product } from '@/lib/types';
+import type { Product, ProductInput } from '@/lib/types';
 
 const productsCollection = collection(db, 'products');
 
 export async function addProduct(product: Omit<Product, 'id'>): Promise<Product> {
     const docRef = await addDoc(productsCollection, product);
     return { id: docRef.id, ...product };
+}
+
+export async function addMultipleProducts(products: ProductInput[]): Promise<Product[]> {
+    const batch = writeBatch(db);
+    const newProducts: Product[] = [];
+    products.forEach(product => {
+        const docRef = doc(productsCollection);
+        batch.set(docRef, product);
+        newProducts.push({ id: docRef.id, ...product });
+    });
+    await batch.commit();
+    return newProducts;
 }
 
 export async function getProducts(): Promise<Product[]> {
@@ -25,6 +37,10 @@ export async function deleteProduct(id: string): Promise<void> {
 }
 
 export async function deleteMultipleProducts(ids: string[]): Promise<void> {
-    const deletePromises = ids.map(id => deleteProduct(id));
-    await Promise.all(deletePromises);
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+        const productDoc = doc(db, 'products', id);
+        batch.delete(productDoc);
+    });
+    await batch.commit();
 }
