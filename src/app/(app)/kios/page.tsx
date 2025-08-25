@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -28,7 +28,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Kiosk } from '@/lib/types';
-import { initialKiosks } from '@/lib/data';
+import { getKiosks, addKiosk, updateKiosk, deleteKiosk } from '@/services/kioskService';
 
 const kioskSchema = z.object({
   name: z.string().min(1, { message: 'Nama kios harus diisi' }),
@@ -37,10 +37,27 @@ const kioskSchema = z.object({
 });
 
 export default function KiosPage() {
-  const [kiosks, setKiosks] = useState<Kiosk[]>(initialKiosks);
+  const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingKiosk, setEditingKiosk] = useState<Kiosk | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    async function loadKiosks() {
+      try {
+        const fetchedKiosks = await getKiosks();
+        setKiosks(fetchedKiosks);
+      } catch (error) {
+        console.error("Firebase Error: ", error);
+        toast({
+          title: 'Gagal Memuat Kios',
+          description: 'Gagal memuat data kios dari database.',
+          variant: 'destructive',
+        });
+      }
+    }
+    loadKiosks();
+  }, [toast]);
 
   const form = useForm<z.infer<typeof kioskSchema>>({
     resolver: zodResolver(kioskSchema),
@@ -65,32 +82,51 @@ export default function KiosPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setKiosks(kiosks.filter((k) => k.id !== id));
-    toast({
-      title: 'Sukses',
-      description: 'Data kios berhasil dihapus.',
-    });
-  };
-
-  const onSubmit = (values: z.infer<typeof kioskSchema>) => {
-    if (editingKiosk) {
-      setKiosks(
-        kiosks.map((k) => (k.id === editingKiosk.id ? { ...k, ...values } : k))
-      );
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteKiosk(id);
+      setKiosks(kiosks.filter((k) => k.id !== id));
       toast({
         title: 'Sukses',
-        description: 'Data kios berhasil diperbarui.',
+        description: 'Data kios berhasil dihapus.',
       });
-    } else {
-      setKiosks([...kiosks, { id: `kiosk-${Date.now()}`, ...values }]);
+    } catch (error) {
       toast({
-        title: 'Sukses',
-        description: 'Kios baru berhasil ditambahkan.',
+        title: 'Error',
+        description: 'Gagal menghapus data kios.',
+        variant: 'destructive',
       });
     }
-    setIsDialogOpen(false);
-    setEditingKiosk(null);
+  };
+
+  const onSubmit = async (values: z.infer<typeof kioskSchema>) => {
+    try {
+      if (editingKiosk) {
+        await updateKiosk(editingKiosk.id, values);
+        setKiosks(
+          kiosks.map((k) => (k.id === editingKiosk.id ? { ...k, ...values } : k))
+        );
+        toast({
+          title: 'Sukses',
+          description: 'Data kios berhasil diperbarui.',
+        });
+      } else {
+        const newKiosk = await addKiosk(values);
+        setKiosks([...kiosks, newKiosk]);
+        toast({
+          title: 'Sukses',
+          description: 'Kios baru berhasil ditambahkan.',
+        });
+      }
+      setIsDialogOpen(false);
+      setEditingKiosk(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menyimpan data kios.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

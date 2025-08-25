@@ -29,8 +29,9 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, Redemption, DORelease } from '@/lib/types';
-import { initialRedemptions, initialDOReleases } from '@/lib/data';
 import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultipleProducts } from '@/services/productService';
+import { getRedemptions } from '@/services/redemptionService';
+import { getDOReleases } from '@/services/doReleaseService';
 
 
 const productSchema = z.object({
@@ -41,28 +42,29 @@ const productSchema = z.object({
 
 export default function ProdukPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [redemptions] = useState<Redemption[]>(initialRedemptions);
-  const [doReleases] = useState<DORelease[]>(initialDOReleases);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [doReleases, setDoReleases] = useState<DORelease[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    async function loadProducts() {
+    async function loadData() {
       try {
-        const fetchedProducts = await getProducts();
-        setProducts(fetchedProducts);
+        setProducts(await getProducts());
+        setRedemptions(await getRedemptions());
+        setDoReleases(await getDOReleases());
       } catch (error) {
         console.error("Firebase Error: ", error);
         toast({
-          title: 'Gagal Memuat Produk',
+          title: 'Gagal Memuat Data',
           description: 'Pastikan konfigurasi Firebase Anda sudah benar dan layanan Firestore telah diaktifkan.',
           variant: 'destructive',
         });
       }
     }
-    loadProducts();
+    loadData();
   }, [toast]);
 
   const form = useForm<z.infer<typeof productSchema>>({
@@ -134,11 +136,11 @@ export default function ProdukPage() {
   const onSubmit = async (values: z.infer<typeof productSchema>) => {
     try {
       if (editingProduct) {
-        const updatedProduct = { ...editingProduct, ...values };
-        await updateProduct(editingProduct.id, values);
+        const updatedProductData = { ...values };
+        await updateProduct(editingProduct.id, updatedProductData);
         setProducts(
           products.map((p) =>
-            p.id === editingProduct.id ? updatedProduct : p
+            p.id === editingProduct.id ? { ...p, ...updatedProductData } : p
           )
         );
         toast({

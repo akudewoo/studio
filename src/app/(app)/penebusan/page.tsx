@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Redemption, Product } from '@/lib/types';
-import { initialRedemptions, initialProducts } from '@/lib/data';
+import { getRedemptions, addRedemption, updateRedemption, deleteRedemption } from '@/services/redemptionService';
+import { getProducts } from '@/services/productService';
 
 const redemptionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus diisi' }),
@@ -42,11 +43,27 @@ const redemptionSchema = z.object({
 });
 
 export default function PenebusanPage() {
-  const [redemptions, setRedemptions] = useState<Redemption[]>(initialRedemptions);
-  const [products] = useState<Product[]>(initialProducts);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRedemption, setEditingRedemption] = useState<Redemption | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setRedemptions(await getRedemptions());
+        setProducts(await getProducts());
+      } catch (error) {
+        toast({
+          title: 'Gagal memuat data',
+          description: 'Terjadi kesalahan saat memuat data dari database.',
+          variant: 'destructive',
+        });
+      }
+    }
+    loadData();
+  }, [toast]);
 
   const form = useForm<z.infer<typeof redemptionSchema>>({
     resolver: zodResolver(redemptionSchema),
@@ -89,37 +106,54 @@ export default function PenebusanPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setRedemptions(redemptions.filter((r) => r.id !== id));
-    toast({
-      title: 'Sukses',
-      description: 'Data penebusan berhasil dihapus.',
-    });
-  };
-
-  const onSubmit = (values: z.infer<typeof redemptionSchema>) => {
-    if (editingRedemption) {
-      setRedemptions(
-        redemptions.map((r) =>
-          r.id === editingRedemption.id ? { ...r, ...values, date: new Date(values.date).toISOString() } : r
-        )
-      );
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteRedemption(id);
+      setRedemptions(redemptions.filter((r) => r.id !== id));
       toast({
         title: 'Sukses',
-        description: 'Data penebusan berhasil diperbarui.',
+        description: 'Data penebusan berhasil dihapus.',
       });
-    } else {
-      setRedemptions([
-        ...redemptions,
-        { id: `red-${Date.now()}`, ...values, date: new Date(values.date).toISOString() },
-      ]);
+    } catch (error) {
       toast({
-        title: 'Sukses',
-        description: 'Penebusan baru berhasil ditambahkan.',
+        title: 'Error',
+        description: 'Gagal menghapus data penebusan.',
+        variant: 'destructive',
       });
     }
-    setIsDialogOpen(false);
-    setEditingRedemption(null);
+  };
+
+  const onSubmit = async (values: z.infer<typeof redemptionSchema>) => {
+    const redemptionData = { ...values, date: new Date(values.date).toISOString() };
+    try {
+      if (editingRedemption) {
+        await updateRedemption(editingRedemption.id, redemptionData);
+        setRedemptions(
+          redemptions.map((r) =>
+            r.id === editingRedemption.id ? { id: r.id, ...redemptionData } : r
+          )
+        );
+        toast({
+          title: 'Sukses',
+          description: 'Data penebusan berhasil diperbarui.',
+        });
+      } else {
+        const newRedemption = await addRedemption(redemptionData);
+        setRedemptions([ ...redemptions, newRedemption ]);
+        toast({
+          title: 'Sukses',
+          description: 'Penebusan baru berhasil ditambahkan.',
+        });
+      }
+      setIsDialogOpen(false);
+      setEditingRedemption(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menyimpan data penebusan.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (

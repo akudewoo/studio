@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { KioskDistribution, Kiosk, Product, Redemption, Payment, DORelease } from '@/lib/types';
-import { initialKioskDistributions, initialKiosks, initialProducts, initialRedemptions, initialPayments, initialDOReleases } from '@/lib/data';
+import { getKioskDistributions, addKioskDistribution, updateKioskDistribution, deleteKioskDistribution } from '@/services/kioskDistributionService';
+import { getKiosks } from '@/services/kioskService';
+import { getProducts } from '@/services/productService';
+import { getRedemptions } from '@/services/redemptionService';
+import { getPayments } from '@/services/paymentService';
+import { getDOReleases } from '@/services/doReleaseService';
 
 const distributionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
@@ -42,15 +47,35 @@ const distributionSchema = z.object({
 });
 
 export default function PenyaluranKiosPage() {
-  const [distributions, setDistributions] = useState<KioskDistribution[]>(initialKioskDistributions);
-  const [doReleases] = useState<DORelease[]>(initialDOReleases);
-  const [redemptions] = useState<Redemption[]>(initialRedemptions);
-  const [products] = useState<Product[]>(initialProducts);
-  const [kiosks] = useState<Kiosk[]>(initialKiosks);
-  const [payments] = useState<Payment[]>(initialPayments);
+  const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
+  const [doReleases, setDoReleases] = useState<DORelease[]>([]);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [kiosks, setKiosks] = useState<Kiosk[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDist, setEditingDist] = useState<KioskDistribution | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setDistributions(await getKioskDistributions());
+        setDoReleases(await getDOReleases());
+        setRedemptions(await getRedemptions());
+        setProducts(await getProducts());
+        setKiosks(await getKiosks());
+        setPayments(await getPayments());
+      } catch (error) {
+        toast({
+          title: 'Gagal memuat data',
+          description: 'Terjadi kesalahan saat memuat data dari database.',
+          variant: 'destructive',
+        });
+      }
+    }
+    loadData();
+  }, [toast]);
 
   const form = useForm<z.infer<typeof distributionSchema>>({
     resolver: zodResolver(distributionSchema),
@@ -75,12 +100,17 @@ export default function PenyaluranKiosPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setDistributions(distributions.filter((d) => d.id !== id));
-    toast({ title: 'Sukses', description: 'Data penyaluran berhasil dihapus.' });
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteKioskDistribution(id);
+      setDistributions(distributions.filter((d) => d.id !== id));
+      toast({ title: 'Sukses', description: 'Data penyaluran berhasil dihapus.' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Gagal menghapus data penyaluran.', variant: 'destructive' });
+    }
   };
 
-  const onSubmit = (values: z.infer<typeof distributionSchema>) => {
+  const onSubmit = async (values: z.infer<typeof distributionSchema>) => {
     const { doRelease } = getDetails(values.doNumber);
     const distributedQty = distributions.filter(d => d.doNumber === values.doNumber).reduce((sum, d) => sum + d.quantity, 0);
 
@@ -90,15 +120,23 @@ export default function PenyaluranKiosPage() {
             return;
         }
     }
+    
+    const distributionData = { ...values, date: new Date(values.date).toISOString() };
 
-    if (editingDist) {
-      setDistributions(distributions.map((d) => (d.id === editingDist.id ? { ...d, ...values, date: new Date(values.date).toISOString() } : d)));
-      toast({ title: 'Sukses', description: 'Data penyaluran berhasil diperbarui.' });
-    } else {
-      setDistributions([...distributions, { id: `dist-${Date.now()}`, ...values, date: new Date(values.date).toISOString() }]);
-      toast({ title: 'Sukses', description: 'Penyaluran baru berhasil ditambahkan.' });
+    try {
+      if (editingDist) {
+        await updateKioskDistribution(editingDist.id, distributionData);
+        setDistributions(distributions.map((d) => (d.id === editingDist.id ? { id: d.id, ...distributionData } : d)));
+        toast({ title: 'Sukses', description: 'Data penyaluran berhasil diperbarui.' });
+      } else {
+        const newDist = await addKioskDistribution(distributionData);
+        setDistributions([...distributions, newDist]);
+        toast({ title: 'Sukses', description: 'Penyaluran baru berhasil ditambahkan.' });
+      }
+      setIsDialogOpen(false);
+    } catch (error) {
+      toast({ title: 'Error', description: 'Gagal menyimpan data penyaluran.', variant: 'destructive' });
     }
-    setIsDialogOpen(false);
   };
 
   return (

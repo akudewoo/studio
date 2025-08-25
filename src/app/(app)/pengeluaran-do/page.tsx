@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { DORelease, Redemption, Product } from '@/lib/types';
-import { initialDOReleases, initialRedemptions, initialProducts } from '@/lib/data';
+import { getDOReleases, addDORelease, updateDORelease, deleteDORelease } from '@/services/doReleaseService';
+import { getRedemptions } from '@/services/redemptionService';
+import { getProducts } from '@/services/productService';
 
 const doReleaseSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
@@ -40,12 +42,29 @@ const doReleaseSchema = z.object({
 });
 
 export default function PengeluaranDOPage() {
-  const [doReleases, setDoReleases] = useState<DORelease[]>(initialDOReleases);
-  const [redemptions] = useState<Redemption[]>(initialRedemptions);
-  const [products] = useState<Product[]>(initialProducts);
+  const [doReleases, setDoReleases] = useState<DORelease[]>([]);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRelease, setEditingRelease] = useState<DORelease | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setDoReleases(await getDOReleases());
+        setRedemptions(await getRedemptions());
+        setProducts(await getProducts());
+      } catch (error) {
+        toast({
+          title: 'Gagal memuat data',
+          description: 'Terjadi kesalahan saat memuat data dari database.',
+          variant: 'destructive',
+        });
+      }
+    }
+    loadData();
+  }, [toast]);
 
   const form = useForm<z.infer<typeof doReleaseSchema>>({
     resolver: zodResolver(doReleaseSchema),
@@ -88,40 +107,69 @@ export default function PengeluaranDOPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setDoReleases(doReleases.filter((r) => r.id !== id));
-    toast({
-      title: 'Sukses',
-      description: 'Data pengeluaran DO berhasil dihapus.',
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDORelease(id);
+      setDoReleases(doReleases.filter((r) => r.id !== id));
+      toast({
+        title: 'Sukses',
+        description: 'Data pengeluaran DO berhasil dihapus.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menghapus data pengeluaran DO.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const onSubmit = (values: z.infer<typeof doReleaseSchema>) => {
+  const onSubmit = async (values: z.infer<typeof doReleaseSchema>) => {
     const redemption = redemptionMap[values.doNumber];
-    if (values.quantity > redemption.quantity) {
-      form.setError("quantity", { type: "manual", message: `QTY tidak boleh lebih dari QTY Penebusan (${redemption.quantity})` });
+    if (!redemption) {
+      toast({ title: 'Error', description: 'Data penebusan tidak ditemukan.', variant: 'destructive' });
       return;
     }
     
-    const newRelease = { ...values, date: new Date(values.date).toISOString(), redemptionQuantity: redemption.quantity };
+    const releasedQtyForThisDO = doReleases
+        .filter(r => r.doNumber === values.doNumber && r.id !== editingRelease?.id)
+        .reduce((sum, r) => sum + r.quantity, 0);
 
-    if (editingRelease) {
-      setDoReleases(
-        doReleases.map((r) => (r.id === editingRelease.id ? { ...r, ...newRelease } : r))
-      );
-      toast({ title: 'Sukses', description: 'Data Pengeluaran DO berhasil diperbarui.' });
-    } else {
-      setDoReleases([...doReleases, { id: `dor-${Date.now()}`, ...newRelease }]);
-      toast({ title: 'Sukses', description: 'Pengeluaran DO baru berhasil ditambahkan.' });
+    if (values.quantity + releasedQtyForThisDO > redemption.quantity) {
+      form.setError("quantity", { type: "manual", message: `QTY melebihi QTY Penebusan (${redemption.quantity - releasedQtyForThisDO} tersedia)` });
+      return;
     }
-    setIsDialogOpen(false);
-    setEditingRelease(null);
+    
+    const releaseData = { ...values, date: new Date(values.date).toISOString(), redemptionQuantity: redemption.quantity };
+
+    try {
+      if (editingRelease) {
+        await updateDORelease(editingRelease.id, releaseData);
+        setDoReleases(
+          doReleases.map((r) => (r.id === editingRelease.id ? { ...editingRelease, ...releaseData } : r))
+        );
+        toast({ title: 'Sukses', description: 'Data Pengeluaran DO berhasil diperbarui.' });
+      } else {
+        const newRelease = await addDORelease(releaseData);
+        setDoReleases([...doReleases, newRelease]);
+        toast({ title: 'Sukses', description: 'Pengeluaran DO baru berhasil ditambahkan.' });
+      }
+      setIsDialogOpen(false);
+      setEditingRelease(null);
+    } catch (error) {
+       toast({ title: 'Error', description: 'Gagal menyimpan data pengeluaran DO.', variant: 'destructive' });
+    }
   };
   
-  const sisaPenebusan = (doNumber: string, redemptionQty: number) => {
-      const totalReleased = doReleases.filter(r => r.doNumber === doNumber).reduce((sum, r) => sum + r.quantity, 0);
-      return redemptionQty - totalReleased;
-  }
+  const sisaPenebusanByDO = useMemo(() => {
+      const sisa: Record<string, number> = {};
+      redemptions.forEach(r => {
+        const totalReleased = doReleases.filter(d => d.doNumber === r.doNumber).reduce((sum, rel) => sum + rel.quantity, 0);
+        sisa[r.doNumber] = r.quantity - totalReleased;
+      });
+      return sisa;
+  }, [doReleases, redemptions]);
+
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -152,7 +200,7 @@ export default function PengeluaranDOPage() {
               {doReleases.map((release) => {
                 const redemption = redemptionMap[release.doNumber];
                 const product = redemption ? productMap[redemption.productId] : null;
-                const remaining = sisaPenebusan(release.doNumber, release.redemptionQuantity) + release.quantity;
+                const sisa = sisaPenebusanByDO[release.doNumber] ?? 0;
 
                 return (
                   <TableRow key={release.id}>
@@ -161,7 +209,7 @@ export default function PengeluaranDOPage() {
                     <TableCell>{product?.name || 'N/A'}</TableCell>
                     <TableCell className="text-right">{release.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-right">{release.redemptionQuantity.toLocaleString('id-ID')}</TableCell>
-                    <TableCell className="text-right">{(remaining - release.quantity).toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-right">{sisa.toLocaleString('id-ID')}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -189,7 +237,7 @@ export default function PengeluaranDOPage() {
               <FormField name="doNumber" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>NO DO</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!editingRelease}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Pilih NO DO dari penebusan" /></SelectTrigger></FormControl>
                     <SelectContent>
                       {redemptions.map(r => <SelectItem key={r.doNumber} value={r.doNumber}>{r.doNumber} ({productMap[r.productId]?.name})</SelectItem>)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Payment, Kiosk, KioskDistribution } from '@/lib/types';
-import { initialPayments, initialKiosks, initialKioskDistributions } from '@/lib/data';
+import { getPayments, addPayment, updatePayment, deletePayment } from '@/services/paymentService';
+import { getKioskDistributions } from '@/services/kioskDistributionService';
+import { getKiosks } from '@/services/kioskService';
 
 const paymentSchema = z.object({
   date: z.string().min(1, { message: 'Tanggal harus diisi' }),
@@ -41,12 +43,29 @@ const paymentSchema = z.object({
 });
 
 export default function PembayaranPage() {
-  const [payments, setPayments] = useState<Payment[]>(initialPayments);
-  const [distributions] = useState<KioskDistribution[]>(initialKioskDistributions);
-  const [kiosks] = useState<Kiosk[]>(initialKiosks);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
+  const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setPayments(await getPayments());
+        setDistributions(await getKioskDistributions());
+        setKiosks(await getKiosks());
+      } catch (error) {
+        toast({
+          title: 'Gagal memuat data',
+          description: 'Terjadi kesalahan saat memuat data dari database.',
+          variant: 'destructive',
+        });
+      }
+    }
+    loadData();
+  }, [toast]);
 
   const form = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
@@ -77,20 +96,32 @@ export default function PembayaranPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setPayments(payments.filter((p) => p.id !== id));
-    toast({ title: 'Sukses', description: 'Data pembayaran berhasil dihapus.' });
+  const handleDelete = async (id: string) => {
+    try {
+      await deletePayment(id);
+      setPayments(payments.filter((p) => p.id !== id));
+      toast({ title: 'Sukses', description: 'Data pembayaran berhasil dihapus.' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Gagal menghapus pembayaran.', variant: 'destructive' });
+    }
   };
 
-  const onSubmit = (values: z.infer<typeof paymentSchema>) => {
-    if (editingPayment) {
-      setPayments(payments.map((p) => (p.id === editingPayment.id ? { ...p, ...values, date: new Date(values.date).toISOString() } : p)));
-      toast({ title: 'Sukses', description: 'Data pembayaran berhasil diperbarui.' });
-    } else {
-      setPayments([...payments, { id: `pay-${Date.now()}`, ...values, date: new Date(values.date).toISOString() }]);
-      toast({ title: 'Sukses', description: 'Pembayaran baru berhasil ditambahkan.' });
+  const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
+    try {
+      const paymentData = { ...values, date: new Date(values.date).toISOString() };
+      if (editingPayment) {
+        await updatePayment(editingPayment.id, paymentData);
+        setPayments(payments.map((p) => (p.id === editingPayment.id ? { id: p.id, ...paymentData } : p)));
+        toast({ title: 'Sukses', description: 'Data pembayaran berhasil diperbarui.' });
+      } else {
+        const newPayment = await addPayment(paymentData);
+        setPayments([...payments, newPayment]);
+        toast({ title: 'Sukses', description: 'Pembayaran baru berhasil ditambahkan.' });
+      }
+      setIsDialogOpen(false);
+    } catch (error) {
+      toast({ title: 'Error', description: 'Gagal menyimpan pembayaran.', variant: 'destructive' });
     }
-    setIsDialogOpen(false);
   };
 
   return (
