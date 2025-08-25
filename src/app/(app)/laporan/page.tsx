@@ -24,6 +24,32 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 type ReportType = 'harian' | 'mingguan' | 'bulanan';
 
+const tableStyles = `
+<style>
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+  }
+  .report-table th, .report-table td {
+    border: 1px solid #e2e8f0;
+    padding: 0.5rem;
+    text-align: left;
+  }
+  .report-table th {
+    background-color: #f1f5f9;
+    font-weight: 600;
+  }
+  .report-table tfoot td {
+    font-weight: 600;
+  }
+  .text-right {
+    text-align: right;
+  }
+</style>
+`;
+
 export default function LaporanPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedWeek, setSelectedWeek] = useState<Date | undefined>();
@@ -133,7 +159,7 @@ export default function LaporanPage() {
       const dailyDoReleases = doReleases.filter(dr => dateFilter(new Date(dr.date)));
       const dailyDistributions = distributions.filter(d => dateFilter(new Date(d.date)));
 
-      let generatedSummary = ``;
+      let generatedSummary = tableStyles;
 
       // Penebusan
       let totalRedemption = 0;
@@ -144,18 +170,17 @@ export default function LaporanPage() {
         redemptionByProduct[productName] = (redemptionByProduct[productName] || 0) + r.quantity;
       });
       generatedSummary += `<div><h4>Penebusan</h4>`;
-      generatedSummary += `<p>Total: <strong>${totalRedemption.toLocaleString('id-ID')} Ton</strong></p>`;
       if (Object.keys(redemptionByProduct).length > 0) {
-        generatedSummary += `<ul>`;
+        generatedSummary += `<table class="report-table"><thead><tr><th>Nama Produk</th><th class="text-right">QTY (Ton)</th></tr></thead><tbody>`;
         for (const productName in redemptionByProduct) {
-          generatedSummary += `<li>${productName}: ${redemptionByProduct[productName].toLocaleString('id-ID')} Ton</li>`;
+          generatedSummary += `<tr><td>${productName}</td><td class="text-right">${redemptionByProduct[productName].toLocaleString('id-ID')}</td></tr>`;
         }
-        generatedSummary += `</ul>`;
+        generatedSummary += `</tbody><tfoot><tr><td>Total</td><td class="text-right">${totalRedemption.toLocaleString('id-ID')}</td></tr></tfoot></table>`;
       } else {
         generatedSummary += `<p class='text-muted-foreground'>- Tidak ada data.</p>`;
       }
       generatedSummary += `</div>`;
-
+      
       // Pengeluaran DO
       let totalDoRelease = 0;
       const doReleaseByProduct: Record<string, number> = {};
@@ -166,13 +191,12 @@ export default function LaporanPage() {
         doReleaseByProduct[productName] = (doReleaseByProduct[productName] || 0) + dr.quantity;
       });
       generatedSummary += `<div class='mt-4'><h4>Pengeluaran DO</h4>`;
-      generatedSummary += `<p>Total: <strong>${totalDoRelease.toLocaleString('id-ID')} Ton</strong></p>`;
       if (Object.keys(doReleaseByProduct).length > 0) {
-        generatedSummary += `<ul>`;
+        generatedSummary += `<table class="report-table"><thead><tr><th>Nama Produk</th><th class="text-right">QTY (Ton)</th></tr></thead><tbody>`;
         for (const productName in doReleaseByProduct) {
-          generatedSummary += `<li>${productName}: ${doReleaseByProduct[productName].toLocaleString('id-ID')} Ton</li>`;
+          generatedSummary += `<tr><td>${productName}</td><td class="text-right">${doReleaseByProduct[productName].toLocaleString('id-ID')}</td></tr>`;
         }
-        generatedSummary += `</ul>`;
+        generatedSummary += `</tbody><tfoot><tr><td>Total</td><td class="text-right">${totalDoRelease.toLocaleString('id-ID')}</td></tr></tfoot></table>`;
       } else {
         generatedSummary += `<p class='text-muted-foreground'>- Tidak ada data.</p>`;
       }
@@ -193,14 +217,18 @@ export default function LaporanPage() {
         distByKiosk[kioskName].push({ product: productName, quantity: dist.quantity });
       });
       generatedSummary += `<div class='mt-4'><h4>Penyaluran Kios</h4>`;
-      generatedSummary += `<p>Total: <strong>${totalDistribution.toLocaleString('id-ID')} Ton</strong></p>`;
       if (Object.keys(distByKiosk).length > 0) {
-        generatedSummary += `<ul>`;
+        generatedSummary += `<table class="report-table"><thead><tr><th>Nama Kios</th><th>Nama Produk</th><th class="text-right">QTY (Ton)</th></tr></thead><tbody>`;
         for (const kioskName in distByKiosk) {
-          const totalPerKiosk = distByKiosk[kioskName].reduce((sum, item) => sum + item.quantity, 0);
-          generatedSummary += `<li><strong>${kioskName}</strong>: ${totalPerKiosk.toLocaleString('id-ID')} Ton</li>`;
+            distByKiosk[kioskName].forEach((item, index) => {
+                generatedSummary += `<tr>`;
+                if(index === 0) {
+                    generatedSummary += `<td rowspan="${distByKiosk[kioskName].length}">${kioskName}</td>`;
+                }
+                generatedSummary += `<td>${item.product}</td><td class="text-right">${item.quantity.toLocaleString('id-ID')}</td></tr>`;
+            });
         }
-        generatedSummary += `</ul>`;
+        generatedSummary += `</tbody><tfoot><tr><td colspan="2">Total</td><td class="text-right">${totalDistribution.toLocaleString('id-ID')}</td></tr></tfoot></table>`;
       } else {
         generatedSummary += `<p class='text-muted-foreground'>- Tidak ada data.</p>`;
       }
@@ -226,15 +254,14 @@ export default function LaporanPage() {
       return;
     }
     
-    // Dynamically import html2pdf.js only on the client-side
     const html2pdf = (await import('html2pdf.js')).default;
 
     const element = reportContentRef.current;
     const opt = {
-      margin:       1,
+      margin:       0.5,
       filename:     `${summaryTitle.replace(/ /g, '_')}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2 },
+      html2canvas:  { scale: 2, useCORS: true },
       jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
     
@@ -313,17 +340,19 @@ export default function LaporanPage() {
               <div className="flex flex-col gap-4">
                 <div className="grid w-full gap-1.5">
                   <Label htmlFor="summary">Pratinjau Laporan</Label>
-                   <div ref={reportContentRef} className="border rounded-md p-4 min-h-[300px] prose prose-sm max-w-none">
-                     {summary ? (
-                       <>
-                         <h3 className='font-bold text-lg'>{summaryTitle}</h3>
-                         <div dangerouslySetInnerHTML={{ __html: summary }} />
-                       </>
-                     ) : (
-                       <div className="flex items-center justify-center h-full text-muted-foreground">
-                         Laporan akan muncul di sini...
-                       </div>
-                     )}
+                   <div className="border rounded-md p-4 min-h-[300px] prose prose-sm max-w-none">
+                     <div ref={reportContentRef} className="p-2">
+                        {summary ? (
+                          <>
+                            <h3 className='font-bold text-lg mb-4'>{summaryTitle}</h3>
+                            <div dangerouslySetInnerHTML={{ __html: summary }} />
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            Laporan akan muncul di sini...
+                          </div>
+                        )}
+                     </div>
                    </div>
                 </div>
                 <Button onClick={exportToPdf} disabled={!summary}>
