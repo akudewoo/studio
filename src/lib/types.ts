@@ -45,3 +45,11 @@ export interface Payment {
     kioskId: string;
     amount: number;
 }
+
+// Omit 'id' when creating a new entity
+export type ProductInput = Omit<Product, 'id'>;
+export type KioskInput = Omit<Kiosk, 'id'>;
+export type RedemptionInput = Omit<Redemption, 'id'>;
+export type DOReleaseInput = Omit<DORelease, 'id'>;
+export type KioskDistributionInput = Omit<KioskDistribution, 'id'>;
+export type PaymentInput = Omit<Payment, 'id'>;

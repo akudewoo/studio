@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -29,7 +29,9 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, Redemption, DORelease } from '@/lib/types';
-import { initialProducts, initialRedemptions, initialDOReleases } from '@/lib/data';
+import { initialRedemptions, initialDOReleases } from '@/lib/data';
+import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultipleProducts } from '@/services/productService';
+
 
 const productSchema = z.object({
   name: z.string().min(1, { message: 'Nama produk harus diisi' }),
@@ -38,13 +40,21 @@ const productSchema = z.object({
 });
 
 export default function ProdukPage() {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [redemptions] = useState<Redemption[]>(initialRedemptions);
   const [doReleases] = useState<DORelease[]>(initialDOReleases);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    async function loadProducts() {
+      const fetchedProducts = await getProducts();
+      setProducts(fetchedProducts);
+    }
+    loadProducts();
+  }, []);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -95,37 +105,53 @@ export default function ProdukPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id));
-    toast({
-      title: 'Sukses',
-      description: 'Produk berhasil dihapus.',
-    });
-  };
-
-  const onSubmit = (values: z.infer<typeof productSchema>) => {
-    if (editingProduct) {
-      setProducts(
-        products.map((p) =>
-          p.id === editingProduct.id ? { ...p, ...values } : p
-        )
-      );
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteProduct(id);
+      setProducts(products.filter((p) => p.id !== id));
       toast({
         title: 'Sukses',
-        description: 'Produk berhasil diperbarui.',
+        description: 'Produk berhasil dihapus.',
       });
-    } else {
-      setProducts([
-        ...products,
-        { id: `prod-${Date.now()}`, ...values },
-      ]);
+    } catch (error) {
       toast({
-        title: 'Sukses',
-        description: 'Produk baru berhasil ditambahkan.',
+        title: 'Error',
+        description: 'Gagal menghapus produk.',
+        variant: 'destructive',
       });
     }
-    setIsDialogOpen(false);
-    setEditingProduct(null);
+  };
+
+  const onSubmit = async (values: z.infer<typeof productSchema>) => {
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, values);
+        setProducts(
+          products.map((p) =>
+            p.id === editingProduct.id ? { ...p, ...values } : p
+          )
+        );
+        toast({
+          title: 'Sukses',
+          description: 'Produk berhasil diperbarui.',
+        });
+      } else {
+        const newProduct = await addProduct(values);
+        setProducts([ ...products, newProduct ]);
+        toast({
+          title: 'Sukses',
+          description: 'Produk baru berhasil ditambahkan.',
+        });
+      }
+      setIsDialogOpen(false);
+      setEditingProduct(null);
+    } catch (error) {
+       toast({
+        title: 'Error',
+        description: 'Gagal menyimpan produk.',
+        variant: 'destructive',
+      });
+    }
   };
   
   const formatCurrency = (value: number) => {
@@ -148,13 +174,22 @@ export default function ProdukPage() {
     }
   };
   
-  const handleDeleteSelected = () => {
-    setProducts(products.filter(p => !selectedProducts.includes(p.id)));
-    setSelectedProducts([]);
-    toast({
-      title: 'Sukses',
-      description: `${selectedProducts.length} produk berhasil dihapus.`,
-    });
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMultipleProducts(selectedProducts);
+      setProducts(products.filter(p => !selectedProducts.includes(p.id)));
+      setSelectedProducts([]);
+      toast({
+        title: 'Sukses',
+        description: `${selectedProducts.length} produk berhasil dihapus.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menghapus produk terpilih.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -184,8 +219,8 @@ export default function ProdukPage() {
               <TableRow>
                 <TableHead className="w-[50px]">
                    <Checkbox
-                    checked={selectedProducts.length > 0 && selectedProducts.length === products.length}
-                    onCheckedChange={handleSelectAll}
+                    checked={products.length > 0 && selectedProducts.length === products.length}
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     aria-label="Pilih semua"
                   />
                 </TableHead>
