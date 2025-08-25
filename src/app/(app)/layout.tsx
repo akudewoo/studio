@@ -50,7 +50,7 @@ const AppSidebar = () => {
         }
     }, [isLoaded, settings.sidebarOpen, setOpen]);
     
-    const Logo = isLoaded ? getIcon(settings.appIcon) : DefaultLogo;
+    const Logo = isLoaded && settings.appIcon ? getIcon(settings.appIcon) : DefaultLogo;
 
     if (!isLoaded) {
         return (
@@ -74,7 +74,7 @@ const AppSidebar = () => {
             </SidebarHeader>
             <SidebarContent>
                 <SidebarMenu>
-                {[...Array(6)].map((_, i) => (
+                {[...Array(7)].map((_, i) => (
                     <SidebarMenuItem key={i}>
                         <SidebarMenuButton>
                             <div className="size-4 bg-muted rounded-md animate-pulse" />
@@ -147,13 +147,29 @@ const AppSidebar = () => {
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { settings, isLoaded } = useSettings();
+
+  if (!isLoaded) {
+    return (
+        <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+                <div className="flex-1 p-4 space-y-4">
+                   <div className="h-8 w-48 bg-muted rounded-md animate-pulse" />
+                   <div className="h-40 w-full bg-muted rounded-md animate-pulse" />
+                   <div className="h-80 w-full bg-muted rounded-md animate-pulse" />
+                </div>
+            </SidebarInset>
+        </SidebarProvider>
+    )
+  }
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
           <SidebarTrigger />
-          <h1 className="font-headline text-lg font-semibold">AlurDistribusi</h1>
+          <h1 className="font-headline text-lg font-semibold">{settings.appName}</h1>
         </header>
         {children}
       </SidebarInset>
