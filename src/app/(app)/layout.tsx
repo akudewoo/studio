@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -35,7 +36,7 @@ const navItems = [
   { href: '/pengeluaran-do', label: 'Pengeluaran DO', icon: Truck },
   { href: '/penyaluran-kios', label: 'Penyaluran Kios', icon: Warehouse },
   { href: '/pembayaran', label: 'Pembayaran', icon: CircleDollarSign },
-  { href: '/laporan-harian', label: 'Laporan Harian', icon: FileText },
+  { href: '/laporan-harian', label: 'Ringkasan Harian', icon: FileText },
 ];
 
 const AppSidebar = () => {

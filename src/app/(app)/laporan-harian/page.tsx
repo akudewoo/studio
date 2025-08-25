@@ -80,7 +80,7 @@ export default function LaporanHarianPage() {
         const dailyDistributions = distributions.filter(d => isSameDay(new Date(d.date), selectedDate));
         
         const formattedDate = format(selectedDate, 'd MMMM yyyy', { locale: id });
-        let manualSummary = `*Laporan Harian - ${formattedDate}*\n\n`;
+        let manualSummary = `*Ringkasan Harian - ${formattedDate}*\n\n`;
 
         // Penebusan
         let totalRedemption = 0;
@@ -184,7 +184,7 @@ export default function LaporanHarianPage() {
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <h1 className="font-headline text-lg font-semibold md:text-2xl">
-        Laporan Harian
+        Ringkasan Harian
       </h1>
 
       <Card>
