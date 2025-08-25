@@ -79,73 +79,75 @@ export default function LaporanHarianPage() {
         const dailyDoReleases = doReleases.filter(dr => isSameDay(new Date(dr.date), selectedDate));
         const dailyDistributions = distributions.filter(d => isSameDay(new Date(d.date), selectedDate));
         
-        // Penebusan per produk
+        const formattedDate = format(selectedDate, 'd MMMM yyyy', { locale: id });
+        let manualSummary = `*Laporan Harian - ${formattedDate}*\n\n`;
+
+        // Penebusan
+        let totalRedemption = 0;
         const redemptionByProduct: Record<string, number> = {};
         dailyRedemptions.forEach(r => {
+            totalRedemption += r.quantity;
             const productName = productMap[r.productId] || 'Produk tidak diketahui';
             redemptionByProduct[productName] = (redemptionByProduct[productName] || 0) + r.quantity;
         });
 
-        // Pengeluaran DO per produk
+        manualSummary += `*Penebusan*\n`;
+        manualSummary += `Total: *${totalRedemption.toLocaleString('id-ID')} Ton*\n`;
+        if (Object.keys(redemptionByProduct).length > 0) {
+            for(const productName in redemptionByProduct) {
+                manualSummary += `- ${productName}: ${redemptionByProduct[productName].toLocaleString('id-ID')} Ton\n`;
+            }
+        } else {
+            manualSummary += `- Tidak ada data.\n`;
+        }
+        manualSummary += `\n`;
+
+
+        // Pengeluaran DO
+        let totalDoRelease = 0;
         const doReleaseByProduct: Record<string, number> = {};
         dailyDoReleases.forEach(dr => {
+            totalDoRelease += dr.quantity;
             const productId = redemptionProductMap[dr.doNumber];
             const productName = productId ? productMap[productId] : 'Produk tidak diketahui';
             doReleaseByProduct[productName] = (doReleaseByProduct[productName] || 0) + dr.quantity;
         });
 
-        // Penyaluran per kios
-        const distByKiosk: Record<string, { product: string, quantity: number }[]> = {};
+        manualSummary += `*Pengeluaran DO*\n`;
+        manualSummary += `Total: *${totalDoRelease.toLocaleString('id-ID')} Ton*\n`;
+        if (Object.keys(doReleaseByProduct).length > 0) {
+            for(const productName in doReleaseByProduct) {
+                manualSummary += `- ${productName}: ${doReleaseByProduct[productName].toLocaleString('id-ID')} Ton\n`;
+            }
+        } else {
+            manualSummary += `- Tidak ada data.\n`;
+        }
+        manualSummary += `\n`;
+        
+        // Penyaluran
         let totalDistribution = 0;
+        const distByKiosk: Record<string, { product: string, quantity: number }[]> = {};
         dailyDistributions.forEach(dist => {
+          totalDistribution += dist.quantity;
           const kioskName = kioskMap[dist.kioskId] || 'Kios tidak diketahui';
           const productId = redemptionProductMap[dist.doNumber];
           const productName = productId ? productMap[productId] : 'Produk tidak diketahui';
-          totalDistribution += dist.quantity;
-
+          
           if (!distByKiosk[kioskName]) {
             distByKiosk[kioskName] = [];
           }
           distByKiosk[kioskName].push({ product: productName, quantity: dist.quantity });
         });
-        
-        // Manual summary generation
-        const formattedDate = format(selectedDate, 'd MMMM yyyy', { locale: id });
-        let manualSummary = `*Laporan Harian - ${formattedDate}*\n\n`;
-        manualSummary += `📈 *Aktivitas Utama:*\n\n`;
-        
-        manualSummary += `*Total Penyaluran Kios: ${totalDistribution.toLocaleString('id-ID')} Ton*\n\n`;
 
-        manualSummary += `*Penebusan per Produk:*\n`;
-        if (Object.keys(redemptionByProduct).length > 0) {
-            for(const productName in redemptionByProduct) {
-                manualSummary += `- ${productName}: *${redemptionByProduct[productName].toLocaleString('id-ID')} Ton*\n`;
-            }
-        } else {
-            manualSummary += `- Tidak ada data penebusan hari ini.\n`;
-        }
-        manualSummary += `\n`;
-
-        manualSummary += `*Pengeluaran DO per Produk:*\n`;
-        if (Object.keys(doReleaseByProduct).length > 0) {
-            for(const productName in doReleaseByProduct) {
-                manualSummary += `- ${productName}: *${doReleaseByProduct[productName].toLocaleString('id-ID')} Ton*\n`;
-            }
-        } else {
-            manualSummary += `- Tidak ada data pengeluaran DO hari ini.\n`;
-        }
-        manualSummary += `\n`;
-        
-        manualSummary += `🚚 *Rincian Penyaluran Kios:*\n`;
+        manualSummary += `*Penyaluran Kios*\n`;
+        manualSummary += `Total: *${totalDistribution.toLocaleString('id-ID')} Ton*\n`;
         if (Object.keys(distByKiosk).length > 0) {
             for (const kioskName in distByKiosk) {
-                manualSummary += `- *${kioskName}*:\n`;
-                distByKiosk[kioskName].forEach(item => {
-                    manualSummary += `  • ${item.product}: ${item.quantity.toLocaleString('id-ID')} Ton\n`;
-                });
+                const totalPerKiosk = distByKiosk[kioskName].reduce((sum, item) => sum + item.quantity, 0);
+                manualSummary += `- *${kioskName}*: ${totalPerKiosk.toLocaleString('id-ID')} Ton\n`;
             }
         } else {
-            manualSummary += `- Tidak ada data penyaluran hari ini.\n`;
+            manualSummary += `- Tidak ada data.\n`;
         }
 
         setSummary(manualSummary);
@@ -241,5 +243,3 @@ export default function LaporanHarianPage() {
     </div>
   );
 }
-
-    
