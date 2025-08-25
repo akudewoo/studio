@@ -84,24 +84,31 @@ export default function ProdukPage() {
 
     const redeemedQtyByDO: Record<string, {productId: string, quantity: number}> = {};
     redemptions.forEach(redemption => {
-        redeemedQtyByDO[redemption.doNumber] = {
-            productId: redemption.productId,
-            quantity: (redeemedQtyByDO[redemption.doNumber]?.quantity || 0) + redemption.quantity
-        };
+        if (!redeemedQtyByDO[redemption.doNumber]) {
+            redeemedQtyByDO[redemption.doNumber] = { productId: redemption.productId, quantity: 0 };
+        }
+        redeemedQtyByDO[redemption.doNumber].quantity += redemption.quantity;
     });
 
     const releasedQtyByDO: Record<string, number> = {};
     doReleases.forEach(release => {
         releasedQtyByDO[release.doNumber] = (releasedQtyByDO[release.doNumber] || 0) + release.quantity;
     });
+    
+    products.forEach(p => {
+        stock[p.id] = 0;
+        const productRedemptions = redemptions.filter(r => r.productId === p.id);
+        let totalRedeemed = 0;
+        productRedemptions.forEach(r => {
+            totalRedeemed += r.quantity;
+        });
 
-    Object.keys(redeemedQtyByDO).forEach(doNumber => {
-        const { productId, quantity: totalRedeemed } = redeemedQtyByDO[doNumber];
-        const totalReleased = releasedQtyByDO[doNumber] || 0;
-        const remainingStock = totalRedeemed - totalReleased;
-        if (stock[productId] !== undefined) {
-            stock[productId] += remainingStock;
-        }
+        let totalReleased = 0;
+        const productDOReleases = doReleases.filter(dr => productRedemptions.some(r => r.doNumber === dr.doNumber));
+        productDOReleases.forEach(dr => {
+            totalReleased += dr.quantity;
+        });
+        stock[p.id] = totalRedeemed - totalReleased;
     });
     
     return stock;
@@ -123,14 +130,16 @@ export default function ProdukPage() {
   };
 
   const handleDelete = async (id: string) => {
+    const originalProducts = [...products];
+    setProducts(products.filter((p) => p.id !== id));
     try {
       await deleteProduct(id);
-      setProducts(products.filter((p) => p.id !== id));
       toast({
         title: 'Sukses',
         description: 'Produk berhasil dihapus.',
       });
     } catch (error) {
+      setProducts(originalProducts);
       toast({
         title: 'Error',
         description: 'Gagal menghapus produk.',
@@ -140,35 +149,52 @@ export default function ProdukPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof productSchema>) => {
-    try {
-      if (editingProduct) {
-        const updatedProductData = { ...values };
-        await updateProduct(editingProduct.id, updatedProductData);
-        setProducts(
-          products.map((p) =>
-            p.id === editingProduct.id ? { ...p, ...updatedProductData } : p
-          )
-        );
+    setIsDialogOpen(false);
+
+    if (editingProduct) {
+      const originalProducts = [...products];
+      const updatedProduct = { ...editingProduct, ...values };
+      setProducts(products.map((p) => (p.id === editingProduct.id ? updatedProduct : p)));
+      
+      try {
+        await updateProduct(editingProduct.id, values);
         toast({
           title: 'Sukses',
           description: 'Produk berhasil diperbarui.',
         });
-      } else {
+      } catch (error) {
+        setProducts(originalProducts);
+        toast({
+          title: 'Error',
+          description: 'Gagal memperbarui produk.',
+          variant: 'destructive',
+        });
+      } finally {
+        setEditingProduct(null);
+      }
+    } else {
+      // Optimistic addition
+      const tempId = `temp-${Date.now()}`;
+      const newProduct optimistic = { id: tempId, ...values };
+      setProducts(prevProducts => [...prevProducts, newProduct_optimistic]);
+
+      try {
         const newProduct = await addProduct(values);
-        setProducts([ ...products, newProduct ]);
+        // Replace temporary product with the real one from the server
+        setProducts(prevProducts => prevProducts.map(p => p.id === tempId ? newProduct : p));
         toast({
           title: 'Sukses',
           description: 'Produk baru berhasil ditambahkan.',
         });
+      } catch (error) {
+        // Revert optimistic update
+        setProducts(prevProducts => prevProducts.filter(p => p.id !== tempId));
+        toast({
+          title: 'Error',
+          description: 'Gagal menyimpan produk.',
+          variant: 'destructive',
+        });
       }
-      setIsDialogOpen(false);
-      setEditingProduct(null);
-    } catch (error) {
-       toast({
-        title: 'Error',
-        description: 'Gagal menyimpan produk.',
-        variant: 'destructive',
-      });
     }
   };
   
@@ -193,15 +219,20 @@ export default function ProdukPage() {
   };
   
   const handleDeleteSelected = async () => {
+    const originalProducts = [...products];
+    const productsToDelete = selectedProducts;
+
+    setProducts(products.filter(p => !productsToDelete.includes(p.id)));
+    setSelectedProducts([]);
+
     try {
-      await deleteMultipleProducts(selectedProducts);
-      setProducts(products.filter(p => !selectedProducts.includes(p.id)));
-      setSelectedProducts([]);
+      await deleteMultipleProducts(productsToDelete);
       toast({
         title: 'Sukses',
-        description: `${selectedProducts.length} produk berhasil dihapus.`,
+        description: `${productsToDelete.length} produk berhasil dihapus.`,
       });
     } catch (error) {
+      setProducts(originalProducts);
       toast({
         title: 'Error',
         description: 'Gagal menghapus produk terpilih.',
@@ -299,7 +330,13 @@ export default function ProdukPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setEditingProduct(null);
+          form.reset({ name: '', purchasePrice: 0, sellPrice: 0 });
+        }
+        setIsDialogOpen(isOpen);
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="font-headline">
