@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import { Package, Store, CircleDollarSign, AlertCircle, TrendingUp } from 'lucide-react';
+import { Package, Store, CircleDollarSign, AlertCircle, TrendingUp, Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -82,6 +82,7 @@ export default function DashboardPage() {
       stockByProduct: [],
       topOutstandingKiosks: [],
       monthlySales: [],
+      topSellingProducts: [],
     };
 
     const { kiosks, products, redemptions, doReleases, distributions, payments } = data;
@@ -116,10 +117,13 @@ export default function DashboardPage() {
       fill: `hsl(var(--chart-1))`,
     })).sort((a,b) => b.stock - a.stock);
 
-    // Outstanding Bills & Sales
+    // Outstanding Bills, Sales & Top Selling Products
     const kioskBills: Record<string, number> = {};
     kiosks.forEach(k => { kioskBills[k.id] = 0; });
     const salesByMonth: Record<string, number> = {};
+    const soldQtyByProduct: Record<string, number> = {};
+    products.forEach(p => { soldQtyByProduct[p.id] = 0; });
+
 
     distributions.forEach(dist => {
       const redemption = redemptions.find(r => r.doNumber === dist.doNumber);
@@ -133,6 +137,9 @@ export default function DashboardPage() {
         // Sales calculation
         const monthKey = format(parseISO(dist.date), 'yyyy-MM');
         salesByMonth[monthKey] = (salesByMonth[monthKey] || 0) + totalValue;
+
+        // Top selling products calculation
+        soldQtyByProduct[product.id] = (soldQtyByProduct[product.id] || 0) + dist.quantity;
       }
     });
 
@@ -156,8 +163,17 @@ export default function DashboardPage() {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    const topSellingProducts = Object.entries(soldQtyByProduct)
+      .map(([productId, quantity]) => ({
+        productId,
+        name: products.find(p => p.id === productId)?.name || 'N/A',
+        quantity,
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
 
-    return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks, monthlySales };
+
+    return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks, monthlySales, topSellingProducts };
   }, [data]);
   
   if (loading) {
@@ -280,30 +296,63 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-       <Card>
-          <CardHeader>
-            <CardTitle>Stok Produk di Gudang</CardTitle>
-            <CardDescription>Jumlah stok tersedia untuk setiap produk (dalam Ton).</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={{}} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboardMetrics.stockByProduct} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-25} textAnchor="end" height={60} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip 
-                        cursor={{fill: 'hsl(var(--muted))'}}
-                        content={<ChartTooltipContent indicator="dot" />}
-                      />
-                      <Bar dataKey="stock" radius={[4, 4, 0, 0]}>
-                         <LabelList dataKey="stock" position="top" offset={8} className="fill-foreground text-xs" formatter={(value: number) => value.toLocaleString('id-ID')} />
-                      </Bar>
-                  </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Stok Produk di Gudang</CardTitle>
+              <CardDescription>Jumlah stok tersedia untuk setiap produk (dalam Ton).</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={{}} className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboardMetrics.stockByProduct} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-25} textAnchor="end" height={60} />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip 
+                          cursor={{fill: 'hsl(var(--muted))'}}
+                          content={<ChartTooltipContent indicator="dot" />}
+                        />
+                        <Bar dataKey="stock" radius={[4, 4, 0, 0]}>
+                          <LabelList dataKey="stock" position="top" offset={8} className="fill-foreground text-xs" formatter={(value: number) => value.toLocaleString('id-ID')} />
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+           <Card>
+            <CardHeader>
+              <CardTitle>Produk Terlaris</CardTitle>
+              <CardDescription>Top 5 produk yang paling banyak disalurkan ke kios.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Produk</TableHead>
+                    <TableHead className="text-right">QTY Terjual (Ton)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dashboardMetrics.topSellingProducts.length > 0 ? dashboardMetrics.topSellingProducts.map((product) => (
+                    <TableRow key={product.productId}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="text-right font-semibold">{product.quantity.toLocaleString('id-ID')}</TableCell>
+                    </TableRow>
+                  )) : (
+                      <TableRow>
+                          <TableCell colSpan={2} className="text-center">
+                              Belum ada produk yang terjual.
+                          </TableCell>
+                      </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+      </div>
+
     </div>
   );
 }
