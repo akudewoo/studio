@@ -18,6 +18,7 @@ import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import type { Redemption, DORelease, KioskDistribution, Kiosk, Product } from '@/lib/types';
 import { MessageCircle } from 'lucide-react';
+import { generateDailySummary } from '@/ai/flows/summary-flow';
 
 
 export default function LaporanHarianPage() {
@@ -51,7 +52,7 @@ export default function LaporanHarianPage() {
     loadData();
   }, [toast]);
 
-  const generateSummary = () => {
+  const handleGenerateSummary = async () => {
     if (!selectedDate) {
       toast({
         title: 'Tanggal belum dipilih',
@@ -62,48 +63,52 @@ export default function LaporanHarianPage() {
     }
     
     setIsLoading(true);
+    setSummary('');
 
-    const kioskMap = kiosks.reduce((map, k) => { map[k.id] = k.name; return map; }, {} as Record<string, string>);
-    const productMap = products.reduce((map, p) => { map[p.id] = p.name; return map; }, {} as Record<string, string>);
-    const redemptionProductMap = redemptions.reduce((map, r) => { map[r.doNumber] = r.productId; return map; }, {} as Record<string, string>);
+    try {
+        const kioskMap = kiosks.reduce((map, k) => { map[k.id] = k.name; return map; }, {} as Record<string, string>);
+        const productMap = products.reduce((map, p) => { map[p.id] = p.name; return map; }, {} as Record<string, string>);
+        const redemptionProductMap = redemptions.reduce((map, r) => { map[r.doNumber] = r.productId; return map; }, {} as Record<string, string>);
 
-    const dailyRedemptions = redemptions.filter(r => isSameDay(new Date(r.date), selectedDate));
-    const dailyDoReleases = doReleases.filter(dr => isSameDay(new Date(dr.date), selectedDate));
-    const dailyDistributions = distributions.filter(d => isSameDay(new Date(d.date), selectedDate));
-    
-    const redemptionQty = dailyRedemptions.reduce((sum, r) => sum + r.quantity, 0);
-    const doReleaseQty = dailyDoReleases.reduce((sum, dr) => sum + dr.quantity, 0);
+        const dailyRedemptions = redemptions.filter(r => isSameDay(new Date(r.date), selectedDate));
+        const dailyDoReleases = doReleases.filter(dr => isSameDay(new Date(dr.date), selectedDate));
+        const dailyDistributions = distributions.filter(d => isSameDay(new Date(d.date), selectedDate));
+        
+        const redemptionQty = dailyRedemptions.reduce((sum, r) => sum + r.quantity, 0);
+        const doReleaseQty = dailyDoReleases.reduce((sum, dr) => sum + dr.quantity, 0);
 
-    const distByKiosk: Record<string, { product: string, quantity: number }[]> = {};
-    dailyDistributions.forEach(dist => {
-      const kioskName = kioskMap[dist.kioskId] || 'Kios tidak diketahui';
-      const productId = redemptionProductMap[dist.doNumber];
-      const productName = productId ? productMap[productId] : 'Produk tidak diketahui';
+        const distByKiosk: Record<string, { product: string, quantity: number }[]> = {};
+        dailyDistributions.forEach(dist => {
+          const kioskName = kioskMap[dist.kioskId] || 'Kios tidak diketahui';
+          const productId = redemptionProductMap[dist.doNumber];
+          const productName = productId ? productMap[productId] : 'Produk tidak diketahui';
 
-      if (!distByKiosk[kioskName]) {
-        distByKiosk[kioskName] = [];
-      }
-      distByKiosk[kioskName].push({ product: productName, quantity: dist.quantity });
-    });
-    
-    let summaryText = `*Laporan Harian - ${format(selectedDate, 'd MMMM yyyy', { locale: id })}*\n\n`;
-    summaryText += `*Penebusan*: ${redemptionQty.toLocaleString('id-ID')} Kg\n`;
-    summaryText += `*Pengeluaran DO*: ${doReleaseQty.toLocaleString('id-ID')} Kg\n\n`;
-    
-    if (Object.keys(distByKiosk).length > 0) {
-      summaryText += `*Penyaluran Kios*:\n`;
-      for (const kioskName in distByKiosk) {
-        summaryText += `*- ${kioskName}*:\n`;
-        distByKiosk[kioskName].forEach(item => {
-          summaryText += `  • ${item.product}: ${item.quantity.toLocaleString('id-ID')} Kg\n`;
+          if (!distByKiosk[kioskName]) {
+            distByKiosk[kioskName] = [];
+          }
+          distByKiosk[kioskName].push({ product: productName, quantity: dist.quantity });
         });
-      }
-    } else {
-      summaryText += `*Penyaluran Kios*: Tidak ada data penyaluran hari ini.\n`;
+        
+        const summaryData = {
+          date: format(selectedDate, 'd MMMM yyyy', { locale: id }),
+          redemptionQty: redemptionQty,
+          doReleaseQty: doReleaseQty,
+          distributions: distByKiosk
+        }
+        
+        const aiSummary = await generateDailySummary(summaryData);
+        setSummary(aiSummary);
+
+    } catch (error) {
+        console.error("AI summary generation error:", error);
+        toast({
+            title: 'Gagal Membuat Ringkasan AI',
+            description: 'Terjadi kesalahan saat berkomunikasi dengan AI.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsLoading(false);
     }
-    
-    setSummary(summaryText);
-    setIsLoading(false);
   };
   
   const sendToWhatsApp = () => {
@@ -126,14 +131,14 @@ export default function LaporanHarianPage() {
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <h1 className="font-headline text-lg font-semibold md:text-2xl">
-        Laporan Harian
+        Laporan Harian AI
       </h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Buat Ringkasan Harian</CardTitle>
+          <CardTitle>Buat Ringkasan Harian Cerdas</CardTitle>
           <CardDescription>
-            Pilih tanggal untuk membuat ringkasan penebusan, pengeluaran DO, dan penyaluran kios, lalu kirim ke WhatsApp.
+            Pilih tanggal, dan biarkan AI membuatkan ringkasan aktivitas harian yang siap dikirim ke WhatsApp.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2">
@@ -145,17 +150,17 @@ export default function LaporanHarianPage() {
                 className="rounded-md border"
                 locale={id}
               />
-              <Button onClick={generateSummary} disabled={isLoading} className="w-full">
-                {isLoading ? 'Memuat...' : 'Buat Ringkasan'}
+              <Button onClick={handleGenerateSummary} disabled={isLoading} className="w-full">
+                {isLoading ? 'AI Sedang Berpikir...' : 'Minta Ringkasan dari AI'}
               </Button>
           </div>
           
           <div className="flex flex-col gap-4">
             <div className="grid w-full gap-1.5">
-              <Label htmlFor="summary">Ringkasan</Label>
+              <Label htmlFor="summary">Ringkasan AI</Label>
               <Textarea
                   id="summary"
-                  placeholder="Ringkasan akan muncul di sini setelah Anda menekan tombol 'Buat Ringkasan'."
+                  placeholder="Ringkasan cerdas dari AI akan muncul di sini..."
                   value={summary}
                   readOnly
                   rows={10}
