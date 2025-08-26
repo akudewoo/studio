@@ -197,7 +197,6 @@ const AppSidebar = () => {
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
     const router = useRouter();
-    const pathname = usePathname();
     const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
@@ -218,10 +217,6 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
                 </div>
             </div>
         );
-    }
-    
-    if (pathname === '/login') {
-        return <>{children}</>;
     }
 
     return (
