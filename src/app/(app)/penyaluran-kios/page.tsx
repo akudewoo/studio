@@ -118,7 +118,7 @@ export default function PenyaluranKiosPage() {
             return dist.doNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                    getKioskName(dist.kioskId).toLowerCase().includes(searchQuery.toLowerCase()) ||
                    (product && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                   dist.namaSopir.toLowerCase().includes(searchQuery.toLowerCase());
+                   (dist.namaSopir && dist.namaSopir.toLowerCase().includes(searchQuery.toLowerCase()));
         });
     }
 
@@ -739,5 +739,3 @@ export default function PenyaluranKiosPage() {
     </div>
   );
 }
-
-    
