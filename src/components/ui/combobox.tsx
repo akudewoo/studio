@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -64,7 +65,16 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
+        <Command
+          filter={(value, search) => {
+            const option = options.find((option) => option.value === value)
+            if (option && typeof option.label === 'string') {
+              return option.label.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+            }
+            // Fallback for non-string labels or if value doesn't match an option
+            return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+          }}
+        >
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
