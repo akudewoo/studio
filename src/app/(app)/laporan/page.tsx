@@ -131,7 +131,8 @@ export default function LaporanPage() {
   };
 
   const generateDailyRecap = (dateForReport: Date) => {
-      const title = `Rekapitulasi Harian - ${format(dateForReport, 'd MMMM yyyy', { locale: id })}`;
+      const branchName = activeBranch?.name ? ` ${activeBranch.name}` : '';
+      const title = `Rekapitulasi Harian${branchName} - ${format(dateForReport, 'd MMMM yyyy', { locale: id })}`;
       let generatedSummary = `
         ${tableStyles}
         <div class="report-container">
@@ -246,6 +247,7 @@ export default function LaporanPage() {
     let dateFilter: (date: Date) => boolean;
     let title: string;
     let dateForReport: Date | undefined;
+    const branchName = activeBranch?.name ? ` ${activeBranch.name}` : '';
 
     switch (reportType) {
       case 'harian':
@@ -265,7 +267,7 @@ export default function LaporanPage() {
         dateForReport = selectedWeek;
         const weekStart = startOfWeek(dateForReport, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(dateForReport, { weekStartsOn: 1 });
-        title = `Laporan Mingguan - ${format(weekStart, 'd MMM')} s/d ${format(weekEnd, 'd MMM yyyy', { locale: id })}`;
+        title = `Laporan Mingguan${branchName} - ${format(weekStart, 'd MMM')} s/d ${format(weekEnd, 'd MMM yyyy', { locale: id })}`;
         dateFilter = (date) => isWithinInterval(date, { start: weekStart, end: weekEnd });
         break;
       case 'bulanan':
@@ -276,7 +278,7 @@ export default function LaporanPage() {
         dateForReport = selectedMonth;
         const monthStart = startOfMonth(dateForReport);
         const monthEnd = endOfMonth(dateForReport);
-        title = `Laporan Bulanan - ${format(dateForReport, 'MMMM yyyy', { locale: id })}`;
+        title = `Laporan Bulanan${branchName} - ${format(dateForReport, 'MMMM yyyy', { locale: id })}`;
         dateFilter = (date) => isWithinInterval(date, { start: monthStart, end: monthEnd });
         break;
       default:
