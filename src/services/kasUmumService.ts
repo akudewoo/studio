@@ -6,17 +6,19 @@ import type { KasUmum, KasUmumInput } from '@/lib/types';
 const kasUmumCollection = collection(db, 'kasUmum');
 
 export async function addKasUmum(kas: KasUmumInput): Promise<KasUmum> {
-    const docRef = await addDoc(kasUmumCollection, kas);
-    return { id: docRef.id, ...kas };
+    const fullKasData = { ...kas, total: kas.quantity * kas.unitPrice };
+    const docRef = await addDoc(kasUmumCollection, fullKasData);
+    return { id: docRef.id, ...fullKasData };
 }
 
 export async function addMultipleKasUmum(kases: KasUmumInput[]): Promise<KasUmum[]> {
     const batch = writeBatch(db);
     const newKases: KasUmum[] = [];
     kases.forEach(kas => {
+        const fullKasData = { ...kas, total: kas.quantity * kas.unitPrice };
         const docRef = doc(kasUmumCollection);
-        batch.set(docRef, kas);
-        newKases.push({ id: docRef.id, ...kas });
+        batch.set(docRef, fullKasData);
+        newKases.push({ id: docRef.id, ...fullKasData });
     });
     await batch.commit();
     return newKases;
@@ -29,9 +31,12 @@ export async function getKasUmum(branchIds: string[]): Promise<KasUmum[]> {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KasUmum));
 }
 
-export async function updateKasUmum(id: string, kas: Partial<KasUmum>): Promise<void> {
+export async function updateKasUmum(id: string, kas: Partial<KasUmumInput>): Promise<void> {
     const kasDoc = doc(db, 'kasUmum', id);
-    await updateDoc(kasDoc, kas);
+    const fullKasData = (kas.quantity && kas.unitPrice)
+        ? { ...kas, total: kas.quantity * kas.unitPrice }
+        : kas;
+    await updateDoc(kasDoc, fullKasData);
 }
 
 export async function deleteKasUmum(id: string): Promise<void> {

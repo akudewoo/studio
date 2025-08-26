@@ -109,5 +109,5 @@ export type RedemptionInput = Omit<Redemption, 'id'>;
 export type DOReleaseInput = Omit<DORelease, 'id'>;
 export type KioskDistributionInput = Omit<KioskDistribution, 'id'>;
 export type PaymentInput = Omit<Payment, 'id'>;
-export type KasUmumInput = Omit<KasUmum, 'id'>;
+export type KasUmumInput = Omit<KasUmum, 'id' | 'total'>;
 export type KasAngkutanInput = Omit<KasAngkutan, 'id'>;

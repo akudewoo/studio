@@ -18,11 +18,12 @@ import { getKioskDistributions } from '@/services/kioskDistributionService';
 import { getKiosks } from '@/services/kioskService';
 import { getProducts } from '@/services/productService';
 import { getPayments } from '@/services/paymentService';
-import type { Redemption, DORelease, KioskDistribution, Kiosk, Product, Payment } from '@/lib/types';
+import type { Redemption, DORelease, KioskDistribution, Kiosk, Product, Payment, Branch } from '@/lib/types';
 import { Download } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
+import { useAuth } from '@/hooks/use-auth';
 
 type ReportType = 'harian' | 'mingguan' | 'bulanan';
 
@@ -65,12 +66,14 @@ const tableStyles = `
 `;
 
 export default function LaporanPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
+  const { user } = useAuth();
+  const { activeBranch, branches, loading: branchLoading } = useBranch();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedWeek, setSelectedWeek] = useState<Date | undefined>();
   const [selectedMonth, setSelectedMonth] = useState<Date | undefined>();
   
   const [summary, setSummary] = useState('');
+  const [reportType, setReportType] = useState<ReportType>('harian');
   const [summaryTitle, setSummaryTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -130,28 +133,31 @@ export default function LaporanPage() {
     return isNegative ? `(${formattedValue})` : formattedValue;
   };
 
-  const generateDailyRecap = (dateForReport: Date) => {
-      const branchName = activeBranch?.name ? ` TANI MAKMUR ${activeBranch.name}` : ' TANI MAKMUR';
-      const title = `Rekapitulasi Harian${branchName} - ${format(dateForReport, 'd MMMM yyyy', { locale: id })}`;
-      let generatedSummary = `
-        ${tableStyles}
-        <div class="report-container">
-            <h3 class="text-center">${title}</h3>
-      `;
+  const getDailyRecapData = (dateForReport: Date, branch: Branch | { id: string, name: string }) => {
+      const branchId = branch.id;
+
+      const branchProducts = products.filter(p => p.branchId === branchId);
+      const branchKiosks = kiosks.filter(k => k.branchId === branchId);
+      const branchRedemptions = redemptions.filter(r => r.branchId === branchId);
+      const branchDoReleases = doReleases.filter(dr => dr.branchId === branchId);
+      const branchDistributions = distributions.filter(d => d.branchId === branchId);
+      const branchPayments = payments.filter(p => p.branchId === branchId);
+
+      const title = `Rekapitulasi Harian TANI MAKMUR ${branch.name.toUpperCase()} - ${format(dateForReport, 'd MMMM yyyy', { locale: id })}`;
 
       // --- Maps for easy lookup ---
-      const redemptionProductMap = redemptions.reduce((map, r) => { map[r.doNumber] = r.productId; return map }, {} as Record<string, string>);
+      const redemptionProductMap = branchRedemptions.reduce((map, r) => { map[r.doNumber] = r.productId; return map }, {} as Record<string, string>);
 
       // --- Calculations ---
       const yesterday = subDays(dateForReport, 1);
       
-      const stockReconciliationData = products.map(product => {
-          const redemptionsBeforeToday = redemptions.filter(r => r.productId === product.id && parseISO(r.date) <= yesterday);
-          const doReleasesBeforeToday = doReleases.filter(dr => redemptionProductMap[dr.doNumber] === product.id && parseISO(dr.date) <= yesterday);
+      const stockReconciliationData = branchProducts.map(product => {
+          const redemptionsBeforeToday = branchRedemptions.filter(r => r.productId === product.id && parseISO(r.date) <= yesterday);
+          const doReleasesBeforeToday = branchDoReleases.filter(dr => redemptionProductMap[dr.doNumber] === product.id && parseISO(dr.date) <= yesterday);
           const sisaLalu = redemptionsBeforeToday.reduce((sum, r) => sum + r.quantity, 0) - doReleasesBeforeToday.reduce((sum, dr) => sum + dr.quantity, 0);
 
-          const penebusanHariIni = redemptions.filter(r => r.productId === product.id && isSameDay(parseISO(r.date), dateForReport)).reduce((sum, r) => sum + r.quantity, 0);
-          const penyaluranHariIni = distributions.filter(d => redemptionProductMap[d.doNumber] === product.id && isSameDay(parseISO(d.date), dateForReport)).reduce((sum, d) => sum + d.quantity, 0);
+          const penebusanHariIni = branchRedemptions.filter(r => r.productId === product.id && isSameDay(parseISO(r.date), dateForReport)).reduce((sum, r) => sum + r.quantity, 0);
+          const penyaluranHariIni = branchDistributions.filter(d => redemptionProductMap[d.doNumber] === product.id && isSameDay(parseISO(d.date), dateForReport)).reduce((sum, d) => sum + d.quantity, 0);
           
           const stokAkhir = sisaLalu + penebusanHariIni - penyaluranHariIni;
           const jualKeKios = penyaluranHariIni * product.sellPrice;
@@ -168,8 +174,39 @@ export default function LaporanPage() {
           };
       });
 
-      // --- Main Table ---
-      generatedSummary += `<table class="report-table">
+      const totalDistributionsBeforeToday = branchDistributions.filter(d => parseISO(d.date) <= yesterday);
+      const totalPaymentsBeforeToday = branchPayments.filter(p => parseISO(p.date) <= yesterday);
+
+      let sisaTagihanLalu = 0;
+      totalDistributionsBeforeToday.forEach(dist => {
+          const redemption = branchRedemptions.find(r => r.doNumber === dist.doNumber);
+          const product = redemption ? branchProducts.find(p => p.id === redemption.productId) : undefined;
+          if (product) {
+              const totalValue = dist.quantity * product.sellPrice;
+              const totalPaidForThisDist = totalPaymentsBeforeToday.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0) + dist.directPayment;
+              sisaTagihanLalu += totalValue - totalPaidForThisDist;
+          }
+      });
+      
+      const penjualanHariIni = stockReconciliationData.reduce((sum, data) => sum + data.jualKeKios, 0);
+      const pembayaranHariIni = branchPayments.filter(p => isSameDay(parseISO(p.date), dateForReport)).reduce((sum, p) => sum + p.amount, 0)
+          + branchDistributions.filter(d => isSameDay(parseISO(d.date), dateForReport)).reduce((sum, d) => sum + d.directPayment, 0);
+
+      const totalTagihan = sisaTagihanLalu + penjualanHariIni;
+      const sisaTagihanHariIni = totalTagihan - pembayaranHariIni;
+      const sisaPupukValue = stockReconciliationData.reduce((sum, data) => sum + (data.stokAkhir * data.hargaBeli), 0);
+      const totalAsset = sisaTagihanHariIni + sisaPupukValue;
+      
+      return { title, stockReconciliationData, sisaTagihanLalu, penjualanHariIni, totalTagihan, pembayaranHariIni, sisaTagihanHariIni, sisaPupukValue, totalAsset };
+  }
+
+  const generateDailyRecapHTML = (data: ReturnType<typeof getDailyRecapData>) => {
+      let generatedSummary = `
+        ${tableStyles}
+        <div class="report-container">
+            <h3 class="text-center">${data.title}</h3>
+      `;
+       generatedSummary += `<table class="report-table">
           <thead>
               <tr>
                   <th>PRODUK</th>
@@ -183,80 +220,57 @@ export default function LaporanPage() {
           </thead>
           <tbody>
       `;
-      stockReconciliationData.forEach(data => {
+      data.stockReconciliationData.forEach(item => {
           generatedSummary += `
               <tr>
-                  <td>${data.name}</td>
-                  <td class="text-right">${data.sisaLalu.toLocaleString('id-ID')}</td>
-                  <td class="text-right">${data.penyaluran.toLocaleString('id-ID')}</td>
-                  <td class="text-right">${data.penebusan.toLocaleString('id-ID')}</td>
-                  <td class="text-right">${data.stokAkhir.toLocaleString('id-ID')}</td>
-                  <td class="text-right">${formatCurrency(data.hargaJual)}</td>
-                  <td class="text-right">${formatCurrency(data.jualKeKios)}</td>
+                  <td>${item.name}</td>
+                  <td class="text-right">${item.sisaLalu.toLocaleString('id-ID')}</td>
+                  <td class="text-right">${item.penyaluran.toLocaleString('id-ID')}</td>
+                  <td class="text-right">${item.penebusan.toLocaleString('id-ID')}</td>
+                  <td class="text-right">${item.stokAkhir.toLocaleString('id-ID')}</td>
+                  <td class="text-right">${formatCurrency(item.hargaJual)}</td>
+                  <td class="text-right">${formatCurrency(item.jualKeKios)}</td>
               </tr>
           `;
       });
        generatedSummary += `</tbody></table>`;
        
-      // --- Financial Summary ---
-      const totalDistributionsBeforeToday = distributions.filter(d => parseISO(d.date) <= yesterday);
-      const totalPaymentsBeforeToday = payments.filter(p => parseISO(p.date) <= yesterday);
-
-      let sisaTagihanLalu = 0;
-      totalDistributionsBeforeToday.forEach(dist => {
-          const redemption = redemptions.find(r => r.doNumber === dist.doNumber);
-          const product = redemption ? products.find(p => p.id === redemption.productId) : undefined;
-          if (product) {
-              const totalValue = dist.quantity * product.sellPrice;
-              const totalPaidForThisDist = totalPaymentsBeforeToday.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0) + dist.directPayment;
-              sisaTagihanLalu += totalValue - totalPaidForThisDist;
-          }
-      });
-      
-      const penjualanHariIni = stockReconciliationData.reduce((sum, data) => sum + data.jualKeKios, 0);
-      const pembayaranHariIni = payments.filter(p => isSameDay(parseISO(p.date), dateForReport)).reduce((sum, p) => sum + p.amount, 0)
-          + distributions.filter(d => isSameDay(parseISO(d.date), dateForReport)).reduce((sum, d) => sum + d.directPayment, 0);
-
-      const totalTagihan = sisaTagihanLalu + penjualanHariIni;
-      const sisaTagihanHariIni = totalTagihan - pembayaranHariIni;
-      const sisaPupukValue = stockReconciliationData.reduce((sum, data) => sum + (data.stokAkhir * data.hargaBeli), 0);
-      const totalAsset = sisaTagihanHariIni + sisaPupukValue;
-
-
       generatedSummary += `<div class="mt-4">
         <table class="summary-table">
           <tbody>
-            <tr><td>SISA TAGIHAN LALU</td><td>${formatCurrency(sisaTagihanLalu)}</td></tr>
-            <tr><td>PENJUALAN</td><td>${formatCurrency(penjualanHariIni)}</td></tr>
-            <tr><td class="font-bold">TOTAL</td><td class="text-right font-bold">${formatCurrency(totalTagihan)}</td></tr>
-            <tr><td>PEMBAYARAN</td><td>${formatCurrency(pembayaranHariIni)}</td></tr>
-            <tr><td class="font-bold">SISA TAGIHAN HARI INI</td><td class="font-bold">${formatCurrency(sisaTagihanHariIni)}</td></tr>
-            <tr><td>SISA PUPUK</td><td>${formatCurrency(sisaPupukValue)}</td></tr>
-            <tr><td class="font-bold">TOTAL TAGIHAN & PUPUK</td><td class="font-bold">${formatCurrency(totalAsset)}</td></tr>
+            <tr><td>SISA TAGIHAN LALU</td><td>${formatCurrency(data.sisaTagihanLalu)}</td></tr>
+            <tr><td>PENJUALAN</td><td>${formatCurrency(data.penjualanHariIni)}</td></tr>
+            <tr><td class="font-bold">TOTAL</td><td class="text-right font-bold">${formatCurrency(data.totalTagihan)}</td></tr>
+            <tr><td>PEMBAYARAN</td><td>${formatCurrency(data.pembayaranHariIni)}</td></tr>
+            <tr><td class="font-bold">SISA TAGIHAN HARI INI</td><td class="font-bold">${formatCurrency(data.sisaTagihanHariIni)}</td></tr>
+            <tr><td>SISA PUPUK</td><td>${formatCurrency(data.sisaPupukValue)}</td></tr>
+            <tr><td class="font-bold">TOTAL TAGIHAN & PUPUK</td><td class="font-bold">${formatCurrency(data.totalAsset)}</td></tr>
           </tbody>
         </table>
       </div>`;
 
 
       generatedSummary += `</div>`;
-      setSummaryTitle(title);
-      setSummary(generatedSummary);
+      return generatedSummary;
   }
 
-  const generateSummary = async (reportType: ReportType) => {
+  const generateSummary = async (newReportType: ReportType) => {
+    setReportType(newReportType);
     let dateFilter: (date: Date) => boolean;
     let title: string;
     let dateForReport: Date | undefined;
-    const branchName = activeBranch?.name ? ` TANI MAKMUR ${activeBranch.name}` : ' TANI MAKMUR';
+    const branchName = activeBranch?.name ? ` TANI MAKMUR ${activeBranch.name.toUpperCase()}` : ' TANI MAKMUR';
 
-    switch (reportType) {
+    switch (newReportType) {
       case 'harian':
-        if (!selectedDate) {
-          toast({ title: 'Tanggal belum dipilih', variant: 'destructive' });
+        if (!selectedDate || !activeBranch) {
+          toast({ title: 'Tanggal atau Cabang belum dipilih', variant: 'destructive' });
           return;
         }
         setIsLoading(true);
-        generateDailyRecap(selectedDate);
+        const dailyData = getDailyRecapData(selectedDate, activeBranch);
+        setSummaryTitle(dailyData.title);
+        setSummary(generateDailyRecapHTML(dailyData));
         setIsLoading(false);
         return;
       case 'mingguan':
@@ -390,50 +404,84 @@ export default function LaporanPage() {
       setIsLoading(false);
     }
   };
-
+  
   const handleExportPdf = async () => {
-    if (!summary || !reportContentRef.current) {
-        toast({ title: 'Laporan Kosong', description: 'Buat laporan terlebih dahulu.', variant: 'destructive' });
-        return;
-    }
+      if (!summary || !reportContentRef.current) {
+          toast({ title: 'Laporan Kosong', description: 'Buat laporan terlebih dahulu.', variant: 'destructive' });
+          return;
+      }
+      
+      const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
+      const doc = new jsPDF();
+      
+      // Special handling for daily report for owner with "All Branches"
+      if (reportType === 'harian' && user?.role === 'owner' && activeBranch?.id === 'all' && selectedDate) {
+          let isFirstPage = true;
+          for (const branch of branches) {
+              if (!isFirstPage) {
+                  doc.addPage();
+              }
+              const branchData = getDailyRecapData(selectedDate, branch);
+              const html = generateDailyRecapHTML(branchData);
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, 'text/html');
 
-    const { jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
+              const titleEl = htmlDoc.querySelector('h3');
+              doc.text(titleEl?.innerText || branchData.title, 14, 15);
+              
+              const tables = htmlDoc.querySelectorAll('.report-table, .summary-table');
+              let startY = 25;
+              tables.forEach((table) => {
+                  (doc as any).autoTable({
+                      html: table,
+                      startY: startY,
+                      theme: 'grid',
+                      headStyles: { fillColor: [22, 163, 74] },
+                      didDrawPage: (data: any) => { startY = data.cursor.y + 10; },
+                  });
+                  startY = (doc as any).lastAutoTable.finalY + 15;
+              });
 
-    const doc = new jsPDF();
-    const parser = new DOMParser();
-    const htmlDoc = parser.parseFromString(summary, 'text/html');
+              isFirstPage = false;
+          }
+          doc.save(`Laporan_Harian_Semua_Cabang_${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
+      } else {
+          // Default behavior for other reports or roles
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(summary, 'text/html');
 
-    const tables = htmlDoc.querySelectorAll('.report-table, .summary-table');
-    const titleEl = htmlDoc.querySelector('h3');
-    
-    doc.text(titleEl?.innerText || summaryTitle, 14, 15);
-    let startY = 25;
+          const tables = htmlDoc.querySelectorAll('.report-table, .summary-table');
+          const titleEl = htmlDoc.querySelector('h3');
+          
+          doc.text(titleEl?.innerText || summaryTitle, 14, 15);
+          let startY = 25;
 
-    tables.forEach((table) => {
-        const h4 = table.previousElementSibling;
-        if(h4 && h4.tagName === 'H4') {
-            doc.text(h4.textContent || '', 14, startY);
-            startY += 10;
-        }
+          tables.forEach((table) => {
+              const h4 = table.previousElementSibling;
+              if(h4 && h4.tagName === 'H4') {
+                  doc.text(h4.textContent || '', 14, startY);
+                  startY += 10;
+              }
 
-        (doc as any).autoTable({
-            html: table,
-            startY: startY,
-            theme: 'grid',
-            headStyles: { fillColor: [22, 163, 74] }, // example green color
-            didDrawPage: (data: any) => {
-                startY = data.cursor.y + 10;
-            },
-        });
-        startY = (doc as any).lastAutoTable.finalY + 15;
-    });
+              (doc as any).autoTable({
+                  html: table,
+                  startY: startY,
+                  theme: 'grid',
+                  headStyles: { fillColor: [22, 163, 74] }, 
+                  didDrawPage: (data: any) => {
+                      startY = data.cursor.y + 10;
+                  },
+              });
+              startY = (doc as any).lastAutoTable.finalY + 15;
+          });
 
-    doc.save(`${summaryTitle.replace(/ /g, '_')}.pdf`);
+          doc.save(`${summaryTitle.replace(/ /g, '_')}.pdf`);
+      }
   };
 
   const renderCalendar = (
-    reportType: ReportType,
+    calendarReportType: ReportType,
     date: Date | undefined,
     onSelect: (d: Date | undefined) => void,
     footer?: React.ReactNode
@@ -447,10 +495,10 @@ export default function LaporanPage() {
           className="rounded-md border"
           locale={id}
           disabled={(d) => d > new Date()}
-          showOutsideDays={reportType !== 'bulanan'}
+          showOutsideDays={calendarReportType !== 'bulanan'}
           footer={footer}
-          {...(reportType === 'mingguan' && { showWeekNumber: true })}
-          {...(reportType === 'bulanan' && {
+          {...(calendarReportType === 'mingguan' && { showWeekNumber: true })}
+          {...(calendarReportType === 'bulanan' && {
             onMonthChange: onSelect,
             captionLayout: "dropdown-buttons",
             fromYear: 2020,
@@ -460,8 +508,8 @@ export default function LaporanPage() {
       ) : (
         <Skeleton className="h-[298px] w-[320px] rounded-md border" />
       )}
-      <Button onClick={() => generateSummary(reportType)} disabled={isLoading || !date || !mounted || branchLoading} className="w-full">
-        {isLoading ? 'Membuat Laporan...' : `Buat Laporan ${reportType.charAt(0).toUpperCase() + reportType.slice(1)}`}
+      <Button onClick={() => generateSummary(calendarReportType)} disabled={isLoading || !date || !mounted || branchLoading} className="w-full">
+        {isLoading ? 'Membuat Laporan...' : `Buat Laporan ${calendarReportType.charAt(0).toUpperCase() + calendarReportType.slice(1)}`}
       </Button>
     </div>
   );
@@ -483,7 +531,7 @@ export default function LaporanPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="harian" className="w-full">
+          <Tabs defaultValue="harian" className="w-full" onValueChange={(value) => setReportType(value as ReportType)}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="harian">Harian</TabsTrigger>
               <TabsTrigger value="mingguan">Mingguan</TabsTrigger>
