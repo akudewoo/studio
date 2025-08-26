@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons/logo';
+import { useRouter } from 'next/navigation';
 
 const loginSchema = z.object({
   username: z.string().min(1, { message: 'Username harus diisi' }),
@@ -32,9 +33,17 @@ const loginSchema = z.object({
 });
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, user, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, loading, router]);
+
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -45,7 +54,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(values.username, values.password);
-      // The redirection is handled by the AuthProvider
+      // The redirection is handled by the AuthProvider/useEffect hook
     } catch (error: any) {
       toast({
         title: 'Login Gagal',
@@ -56,13 +65,23 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+  
+  if(loading || (!loading && user)){
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+          <div className="text-center">
+              <p>Loading...</p>
+          </div>
+      </div>
+    );
+  }
 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
         <div className="flex justify-center items-center gap-2 mb-2">
             <Logo className="h-8 w-8 text-primary" />
-            <CardTitle className="font-headline text-2xl">ALUR DISTRIBUSI</CardTitle>
+            <CardTitle className="font-headline text-2xl">TANI MAKMUR</CardTitle>
         </div>
         <CardDescription>
           Silakan masuk untuk mengakses sistem.

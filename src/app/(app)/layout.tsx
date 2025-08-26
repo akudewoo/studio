@@ -150,7 +150,7 @@ const AppSidebar = () => {
                     <Link href="/dashboard">
                         <Logo className="size-6 shrink-0 text-primary" />
                         <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                            ALUR DISTRIBUSI
+                            TANI MAKMUR
                         </span>
                     </Link>
                 </Button>
@@ -214,7 +214,7 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
             <SidebarInset>
                 <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
                     <SidebarTrigger />
-                    <h1 className="font-headline text-lg font-semibold">ALUR DISTRIBUSI</h1>
+                    <h1 className="font-headline text-lg font-semibold">TANI MAKMUR</h1>
                 </header>
                 {children}
             </SidebarInset>

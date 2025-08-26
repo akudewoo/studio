@@ -131,7 +131,7 @@ export default function LaporanPage() {
   };
 
   const generateDailyRecap = (dateForReport: Date) => {
-      const branchName = activeBranch?.name ? ` ${activeBranch.name}` : '';
+      const branchName = activeBranch?.name ? ` TANI MAKMUR ${activeBranch.name}` : ' TANI MAKMUR';
       const title = `Rekapitulasi Harian${branchName} - ${format(dateForReport, 'd MMMM yyyy', { locale: id })}`;
       let generatedSummary = `
         ${tableStyles}
@@ -247,7 +247,7 @@ export default function LaporanPage() {
     let dateFilter: (date: Date) => boolean;
     let title: string;
     let dateForReport: Date | undefined;
-    const branchName = activeBranch?.name ? ` ${activeBranch.name}` : '';
+    const branchName = activeBranch?.name ? ` TANI MAKMUR ${activeBranch.name}` : ' TANI MAKMUR';
 
     switch (reportType) {
       case 'harian':
