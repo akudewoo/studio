@@ -32,6 +32,7 @@ import {
   Building,
   LogOut,
   Book,
+  Car,
 } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { BranchProvider, useBranch } from '@/hooks/use-branch';
@@ -48,6 +49,7 @@ const navItems = [
   { href: '/penyaluran-kios', label: 'Penyaluran Kios', icon: Warehouse },
   { href: '/pembayaran', label: 'Pembayaran', icon: CircleDollarSign },
   { href: '/kas-umum', label: 'Kas Umum', icon: Book },
+  { href: '/kas-angkutan', label: 'Kas Angkutan', icon: Car },
   { href: '/ringkasan-harian', label: 'Ringkasan Harian', icon: Newspaper },
   { href: '/laporan', label: 'Laporan', icon: FileText },
 ];

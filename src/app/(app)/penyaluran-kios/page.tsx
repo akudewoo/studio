@@ -50,6 +50,8 @@ const distributionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
   date: z.date({ required_error: 'Tanggal harus diisi' }),
   kioskId: z.string().min(1, { message: 'Kios harus dipilih' }),
+  namaSopir: z.string().min(1, { message: 'Nama Sopir harus diisi' }),
+  jamAngkut: z.string().min(1, { message: 'Jam Angkut harus diisi (e.g., 14:30)'}).regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Format jam tidak valid (HH:MM)"),
   quantity: z.coerce.number().min(1, { message: 'QTY harus lebih dari 0' }),
   directPayment: z.coerce.number().min(0, { message: 'Pembayaran harus positif' }),
 });
@@ -115,7 +117,8 @@ export default function PenyaluranKiosPage() {
             const { product } = getDetails(dist.doNumber);
             return dist.doNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                    getKioskName(dist.kioskId).toLowerCase().includes(searchQuery.toLowerCase()) ||
-                   (product && product.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                   (product && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                   dist.namaSopir.toLowerCase().includes(searchQuery.toLowerCase());
         });
     }
 
@@ -231,7 +234,7 @@ export default function PenyaluranKiosPage() {
 
   const form = useForm<z.infer<typeof distributionSchema>>({
     resolver: zodResolver(distributionSchema),
-    defaultValues: { doNumber: '', date: new Date(), kioskId: '', quantity: 1, directPayment: 0 },
+    defaultValues: { doNumber: '', date: new Date(), kioskId: '', namaSopir: '', jamAngkut: '', quantity: 1, directPayment: 0 },
   });
   
   const productMap = useMemo(() => {
@@ -251,7 +254,7 @@ export default function PenyaluranKiosPage() {
   const handleDialogOpen = (dist: KioskDistribution | null) => {
     setEditingDist(dist);
     if (dist) form.reset({ ...dist, date: new Date(dist.date) });
-    else form.reset({ doNumber: '', date: new Date(), kioskId: '', quantity: 1, directPayment: 0 });
+    else form.reset({ doNumber: '', date: new Date(), kioskId: '', namaSopir: '', jamAngkut: '', quantity: 1, directPayment: 0 });
     setIsDialogOpen(true);
   };
 
@@ -344,6 +347,8 @@ export default function PenyaluranKiosPage() {
             'Kabupaten': user?.role === 'owner' ? getBranchName(dist.branchId) : undefined,
             'Nama Produk': product?.name || 'N/A',
             'Nama Kios': getKioskName(dist.kioskId),
+            'Nama Sopir': dist.namaSopir,
+            'Jam Angkut': dist.jamAngkut,
             'QTY': dist.quantity,
             'Total': total,
             'Dibayar Langsung': dist.directPayment,
@@ -364,26 +369,22 @@ export default function PenyaluranKiosPage() {
 
   const handleExportPdf = () => {
     const headers = user?.role === 'owner'
-        ? [['NO DO', 'Tanggal', 'Kabupaten', 'Nama Produk', 'Nama Kios', 'QTY', 'Total', 'Dibayar Langsung', 'Pembayaran Tempo', 'Kurang Bayar', 'Keterangan']]
-        : [['NO DO', 'Tanggal', 'Nama Produk', 'Nama Kios', 'QTY', 'Total', 'Dibayar Langsung', 'Pembayaran Tempo', 'Kurang Bayar', 'Keterangan']];
+        ? [['NO DO', 'Tanggal', 'Kabupaten', 'Nama Kios', 'Nama Sopir', 'QTY', 'Total', 'Kurang Bayar']]
+        : [['NO DO', 'Tanggal', 'Nama Kios', 'Nama Sopir', 'QTY', 'Total', 'Kurang Bayar']];
         
     const data = sortedAndFilteredDistributions.map(dist => {
         const { product } = getDetails(dist.doNumber);
         const total = product ? dist.quantity * product.sellPrice : 0;
         const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
         const kurangBayar = total - dist.directPayment - totalTempo;
-        const keterangan = kurangBayar <= 0 ? "Lunas" : "Belum Lunas";
         const commonData = [
             dist.doNumber,
             format(new Date(dist.date), 'dd/MM/yyyy'),
-            product?.name || 'N/A',
             getKioskName(dist.kioskId),
+            dist.namaSopir,
             dist.quantity.toLocaleString('id-ID'),
             formatCurrency(total),
-            formatCurrency(dist.directPayment),
-            formatCurrency(totalTempo),
-            formatCurrency(kurangBayar),
-            keterangan
+            formatCurrency(kurangBayar)
         ];
         return user?.role === 'owner' ? [commonData[0], commonData[1], getBranchName(dist.branchId), ...commonData.slice(2)] : commonData;
     });
@@ -428,6 +429,8 @@ export default function PenyaluranKiosPage() {
                     doNumber: String(item['NO DO']),
                     date: excelDate,
                     kioskId: kioskId,
+                    namaSopir: item['Nama Sopir'],
+                    jamAngkut: item['Jam Angkut'],
                     quantity: item['QTY'],
                     directPayment: item['Dibayar Langsung'] || 0,
                     branchId: activeBranch.id,
@@ -582,8 +585,8 @@ export default function PenyaluranKiosPage() {
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
-                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('namaSopir')}>Nama Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('total')}>Total<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('directPayment')}>Dibayar Langsung<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
@@ -617,8 +620,8 @@ export default function PenyaluranKiosPage() {
                     <TableCell className="font-medium px-2">{dist.doNumber}</TableCell>
                     <TableCell className="px-2">{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
                     {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(dist.branchId)}</TableCell>}
-                    <TableCell className="px-2">{product?.name || 'N/A'}</TableCell>
                     <TableCell className="px-2">{getKioskName(dist.kioskId)}</TableCell>
+                    <TableCell className="px-2">{dist.namaSopir}</TableCell>
                     <TableCell className="text-center px-2">{dist.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-right px-2">{formatCurrency(total)}</TableCell>
                     <TableCell className="text-right px-2">{formatCurrency(dist.directPayment)}</TableCell>
@@ -646,12 +649,12 @@ export default function PenyaluranKiosPage() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle className="font-headline">{editingDist ? 'Ubah' : 'Tambah'} Penyaluran</DialogTitle></DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 py-4">
                <FormField name="doNumber" control={form.control} render={({ field }) => (
-                <FormItem className="flex flex-col">
+                <FormItem className="col-span-2">
                   <FormLabel>NO DO</FormLabel>
                    <Combobox
                       options={doOptions}
@@ -668,7 +671,7 @@ export default function PenyaluranKiosPage() {
                 control={form.control}
                 name="date"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem className="col-span-2">
                     <FormLabel>Tanggal</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -706,10 +709,16 @@ export default function PenyaluranKiosPage() {
                 )}
               />
               <FormField name="kioskId" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Nama Kios</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormItem className="col-span-2"><FormLabel>Nama Kios</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Pilih Kios" /></SelectTrigger></FormControl>
                   <SelectContent>{kiosks.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}</SelectContent>
                 </Select><FormMessage /></FormItem>
+              )} />
+              <FormField name="namaSopir" control={form.control} render={({ field }) => (
+                <FormItem><FormLabel>Nama Sopir</FormLabel><FormControl><Input placeholder="cth. Budi" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField name="jamAngkut" control={form.control} render={({ field }) => (
+                <FormItem><FormLabel>Jam Angkut (24H)</FormLabel><FormControl><Input placeholder="cth. 14:30" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField name="quantity" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>QTY</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
@@ -717,7 +726,7 @@ export default function PenyaluranKiosPage() {
               <FormField name="directPayment" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>Dibayar Langsung</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-              <DialogFooter>
+              <DialogFooter className="col-span-2">
                 <DialogClose asChild><Button type="button" variant="secondary">Batal</Button></DialogClose>
                 <Button type="submit">{editingDist ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>
@@ -728,5 +737,3 @@ export default function PenyaluranKiosPage() {
     </div>
   );
 }
-
-    

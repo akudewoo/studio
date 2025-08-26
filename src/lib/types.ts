@@ -55,6 +55,8 @@ export interface KioskDistribution {
     doNumber: string;
     date: string;
     kioskId: string;
+    namaSopir: string;
+    jamAngkut: string; // Format HH:mm
     quantity: number;
     directPayment: number;
     branchId: string;
@@ -80,6 +82,23 @@ export interface KasUmum {
   branchId: string;
 }
 
+export interface KasAngkutan {
+    id: string;
+    date: string;
+    uangMasuk: number;
+    doNumber: string;
+    namaSopir: string;
+    uraian: string;
+    adminFee: number;
+    uangMakan: number;
+    palang: number;
+    solar: number;
+    upahSopir: number;
+    lembur: number;
+    helper: number;
+    branchId: string;
+}
+
 // Omit 'id' when creating a new entity
 export type BranchInput = Omit<Branch, 'id'>;
 export type ProductInput = Omit<Product, 'id'>;
@@ -89,3 +108,4 @@ export type DOReleaseInput = Omit<DORelease, 'id'>;
 export type KioskDistributionInput = Omit<KioskDistribution, 'id'>;
 export type PaymentInput = Omit<Payment, 'id'>;
 export type KasUmumInput = Omit<KasUmum, 'id'>;
+export type KasAngkutanInput = Omit<KasAngkutan, 'id'>;
