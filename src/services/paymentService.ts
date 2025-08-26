@@ -22,7 +22,9 @@ export async function addMultiplePayments(payments: PaymentInput[]): Promise<Pay
 }
 
 export async function getPayments(branchId: string): Promise<Payment[]> {
-    const q = query(paymentsCollection, where("branchId", "==", branchId));
+    const q = branchId === 'all'
+        ? paymentsCollection
+        : query(paymentsCollection, where("branchId", "==", branchId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
 }

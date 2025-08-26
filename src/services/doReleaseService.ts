@@ -22,7 +22,9 @@ export async function addMultipleDOReleases(doReleases: DOReleaseInput[]): Promi
 }
 
 export async function getDOReleases(branchId: string): Promise<DORelease[]> {
-    const q = query(doReleasesCollection, where("branchId", "==", branchId));
+    const q = branchId === 'all'
+        ? doReleasesCollection
+        : query(doReleasesCollection, where("branchId", "==", branchId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DORelease));
 }

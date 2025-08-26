@@ -22,7 +22,9 @@ export async function addMultipleRedemptions(redemptions: RedemptionInput[]): Pr
 }
 
 export async function getRedemptions(branchId: string): Promise<Redemption[]> {
-    const q = query(redemptionsCollection, where("branchId", "==", branchId));
+    const q = branchId === 'all'
+        ? redemptionsCollection
+        : query(redemptionsCollection, where("branchId", "==", branchId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Redemption));
 }

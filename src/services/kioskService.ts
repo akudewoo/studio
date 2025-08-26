@@ -22,7 +22,9 @@ export async function addMultipleKiosks(kiosks: KioskInput[]): Promise<Kiosk[]> 
 }
 
 export async function getKiosks(branchId: string): Promise<Kiosk[]> {
-    const q = query(kiosksCollection, where("branchId", "==", branchId));
+    const q = branchId === 'all' 
+        ? kiosksCollection 
+        : query(kiosksCollection, where("branchId", "==", branchId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kiosk));
 }

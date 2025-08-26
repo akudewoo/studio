@@ -34,15 +34,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (authLoading || !user) return;
       setLoading(true);
       try {
-        let branchData = await getBranches();
-        if (branchData.length === 0 && user?.role === 'owner') {
-          // Initialize with default branches if none exist
-          await Promise.all([
-            addBranch({ name: 'MAGETAN' }),
-            addBranch({ name: 'SRAGEN' }),
-          ]);
-          branchData = await getBranches();
-        }
+        const branchData = await getBranches();
         setBranches(branchData);
 
         // Determine the active branch based on user role
@@ -59,8 +51,8 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Fallback to the first available branch if assigned one not found
             setActiveBranchState(assignedBranch || branchData[0] || null);
         } else {
-            // Default case if something is wrong
-            setActiveBranchState(null);
+            // Default for owner if nothing is stored
+            setActiveBranchState(allBranchesOption);
         }
 
       } catch (error) {

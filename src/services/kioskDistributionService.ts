@@ -22,7 +22,9 @@ export async function addMultipleKioskDistributions(distributions: KioskDistribu
 }
 
 export async function getKioskDistributions(branchId: string): Promise<KioskDistribution[]> {
-    const q = query(kioskDistributionsCollection, where("branchId", "==", branchId));
+    const q = branchId === 'all'
+        ? kioskDistributionsCollection
+        : query(kioskDistributionsCollection, where("branchId", "==", branchId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KioskDistribution));
 }

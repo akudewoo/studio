@@ -22,7 +22,9 @@ export async function addMultipleProducts(products: ProductInput[]): Promise<Pro
 }
 
 export async function getProducts(branchId: string): Promise<Product[]> {
-    const q = query(productsCollection, where("branchId", "==", branchId));
+    const q = branchId === 'all'
+        ? productsCollection
+        : query(productsCollection, where("branchId", "==", branchId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
 }
