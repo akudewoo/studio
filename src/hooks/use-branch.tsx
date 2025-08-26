@@ -30,12 +30,12 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const allBranchesOption = { id: ALL_BRANCHES_ID, name: ALL_BRANCHES_NAME };
 
   useEffect(() => {
-    const fetchBranches = async () => {
-      if (authLoading) return;
+    const fetchBranchesAndSetState = async () => {
+      if (authLoading || !user) return;
       setLoading(true);
       try {
         let branchData = await getBranches();
-        if (branchData.length === 0) {
+        if (branchData.length === 0 && user?.role === 'owner') {
           // Initialize with default branches if none exist
           await Promise.all([
             addBranch({ name: 'MAGETAN' }),
@@ -45,7 +45,8 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         setBranches(branchData);
 
-        if (user?.role === 'owner') {
+        // Determine the active branch based on user role
+        if (user.role === 'owner') {
            const storedBranchId = localStorage.getItem('activeBranchId');
            if (storedBranchId === ALL_BRANCHES_ID) {
               setActiveBranchState(allBranchesOption);
@@ -53,9 +54,13 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
              const branchToActivate = branchData.find(b => b.id === storedBranchId) || allBranchesOption;
              setActiveBranchState(branchToActivate);
            }
-        } else if (user?.role === 'admin' && user.branchId) {
+        } else if (user.role === 'admin' && user.branchId) {
             const assignedBranch = branchData.find(b => b.id === user.branchId);
-            setActiveBranchState(assignedBranch || null);
+            // Fallback to the first available branch if assigned one not found
+            setActiveBranchState(assignedBranch || branchData[0] || null);
+        } else {
+            // Default case if something is wrong
+            setActiveBranchState(null);
         }
 
       } catch (error) {
@@ -64,7 +69,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setLoading(false);
       }
     };
-    fetchBranches();
+    fetchBranchesAndSetState();
   }, [user, authLoading]);
 
   const setActiveBranch = (branch: Branch | { id: string, name: string } | null) => {
@@ -82,6 +87,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const getBranchName = useCallback((branchId: string) => {
+    if (branchId === ALL_BRANCHES_ID) return ALL_BRANCHES_NAME;
     return branches.find(b => b.id === branchId)?.name || 'N/A';
   }, [branches]);
 
@@ -110,4 +116,3 @@ export const useBranch = () => {
   }
   return context;
 };
-
