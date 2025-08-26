@@ -218,7 +218,7 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
                     <SidebarTrigger />
                     <h1 className="font-headline text-lg font-semibold">TANI MAKMUR</h1>
                 </header>
-                {children}
+                <div className="min-h-0 flex-1">{children}</div>
             </SidebarInset>
         </SidebarProvider>
     );
