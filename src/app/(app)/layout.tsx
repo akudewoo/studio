@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -15,6 +15,7 @@ import {
   SidebarInset,
   SidebarTrigger,
   useSidebar,
+  SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,9 +30,12 @@ import {
   Newspaper,
   ChevronDown,
   Building,
+  LogOut,
+  Book,
 } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { BranchProvider, useBranch } from '@/hooks/use-branch';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -43,18 +47,39 @@ const navItems = [
   { href: '/pengeluaran-do', label: 'Pengeluaran DO', icon: Truck },
   { href: '/penyaluran-kios', label: 'Penyaluran Kios', icon: Warehouse },
   { href: '/pembayaran', label: 'Pembayaran', icon: CircleDollarSign },
+  { href: '/kas-umum', label: 'Kas Umum', icon: Book },
   { href: '/ringkasan-harian', label: 'Ringkasan Harian', icon: Newspaper },
   { href: '/laporan', label: 'Laporan', icon: FileText },
 ];
 
 const BranchSelector = () => {
-    const { branches, activeBranch, setActiveBranch, loading } = useBranch();
+    const { branches, activeBranch, setActiveBranch, loading, allBranchesOption } = useBranch();
+    const { user } = useAuth();
     const [popoverOpen, setPopoverOpen] = React.useState(false);
 
     if (loading) {
         return (
             <div className="p-2">
                 <Skeleton className="h-10 w-full" />
+            </div>
+        )
+    }
+
+    // Hide selector if user is not an owner
+    if (user?.role !== 'owner') {
+        return (
+            <div className="p-2">
+                <Button
+                    variant="outline"
+                    className="h-10 w-full justify-start px-2 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                    disabled
+                >
+                    <Building className="size-5 shrink-0" />
+                    <div className="ml-2 flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                        <span className="text-xs text-muted-foreground">Cabang</span>
+                        <span className="text-sm font-semibold">{activeBranch?.name || '...'}</span>
+                    </div>
+                </Button>
             </div>
         )
     }
@@ -76,6 +101,17 @@ const BranchSelector = () => {
             </PopoverTrigger>
             <PopoverContent className="w-[var(--sidebar-width)] p-1" align="start">
                  <div className="flex flex-col gap-1">
+                     <Button
+                        key="all-branches"
+                        variant={activeBranch?.id === allBranchesOption.id ? 'default' : 'ghost'}
+                        className="w-full justify-start"
+                        onClick={() => {
+                            setActiveBranch(allBranchesOption);
+                            setPopoverOpen(false);
+                        }}
+                    >
+                        {allBranchesOption.name}
+                    </Button>
                     {branches.map(branch => (
                         <Button
                             key={branch.id}
@@ -98,6 +134,13 @@ const BranchSelector = () => {
 const AppSidebar = () => {
     const pathname = usePathname();
     const { isMobile } = useSidebar();
+    const { user, logout } = useAuth();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        await logout();
+        router.push('/login');
+    }
 
     return (
         <Sidebar
@@ -110,10 +153,10 @@ const AppSidebar = () => {
                     className="h-10 w-full justify-start px-2 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center"
                     asChild
                 >
-                    <Link href="/produk">
+                    <Link href="/dashboard">
                         <Logo className="size-6 shrink-0 text-primary" />
                         <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                            TANI MAKMUR
+                            ALUR DISTRIBUSI
                         </span>
                     </Link>
                 </Button>
@@ -137,30 +180,71 @@ const AppSidebar = () => {
                     ))}
                 </SidebarMenu>
             </SidebarContent>
+            <SidebarFooter>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton onClick={handleLogout} tooltip={{ children: "Logout" }}>
+                            <LogOut />
+                            <span>Logout ({user?.email})</span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarFooter>
         </Sidebar>
     );
 };
 
+const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
+    const { user, loading } = useAuth();
+    const router = useRouter();
+    const pathname = usePathname();
+    const [mounted, setMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    React.useEffect(() => {
+        if (!loading && !user) {
+            router.push('/login');
+        }
+    }, [user, loading, router]);
+
+    if (loading || !user) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <div className="text-center">
+                    <p>Loading...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    if (pathname === '/login') {
+        return <>{children}</>;
+    }
+
+    return (
+        <BranchProvider>
+            <SidebarProvider>
+                {mounted ? <AppSidebar /> : null}
+                <SidebarInset>
+                    <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
+                        <SidebarTrigger />
+                        <h1 className="font-headline text-lg font-semibold">ALUR DISTRIBUSI</h1>
+                    </header>
+                    {children}
+                </SidebarInset>
+            </SidebarProvider>
+        </BranchProvider>
+    );
+}
+
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-  
-  return (
-    <BranchProvider>
-        <SidebarProvider>
-        {mounted ? <AppSidebar /> : null}
-        <SidebarInset>
-            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
-            <SidebarTrigger />
-            <h1 className="font-headline text-lg font-semibold">TANI MAKMUR</h1>
-            </header>
-            {children}
-        </SidebarInset>
-        </SidebarProvider>
-    </BranchProvider>
-  );
+    return (
+        <AuthProvider>
+            <ProtectedLayout>{children}</ProtectedLayout>
+        </AuthProvider>
+    );
 }

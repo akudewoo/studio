@@ -1,27 +1,37 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { Branch } from '@/lib/types';
 import { getBranches, addBranch } from '@/services/branchService';
+import { useAuth } from './use-auth';
+
+const ALL_BRANCHES_ID = 'all';
+const ALL_BRANCHES_NAME = 'Semua Cabang';
 
 interface BranchContextType {
   branches: Branch[];
-  activeBranch: Branch | null;
-  setActiveBranch: (branch: Branch | null) => void;
+  activeBranch: Branch | { id: string, name: string } | null;
+  allBranchesOption: { id: string, name: string };
+  setActiveBranch: (branch: Branch | { id: string, name: string } | null) => void;
   loading: boolean;
   addBranch: (name: string) => Promise<void>;
+  getBranchName: (branchId: string) => string;
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [activeBranch, setActiveBranchState] = useState<Branch | null>(null);
+  const [activeBranch, setActiveBranchState] = useState<Branch | { id: string, name: string } | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const allBranchesOption = { id: ALL_BRANCHES_ID, name: ALL_BRANCHES_NAME };
 
   useEffect(() => {
     const fetchBranches = async () => {
+      if (authLoading) return;
       setLoading(true);
       try {
         let branchData = await getBranches();
@@ -34,13 +44,18 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           branchData = await getBranches();
         }
         setBranches(branchData);
-        
-        const storedBranchId = localStorage.getItem('activeBranchId');
-        const branchToActivate = branchData.find(b => b.id === storedBranchId) || branchData[0];
-        
-        if(branchToActivate) {
-            setActiveBranchState(branchToActivate);
-            localStorage.setItem('activeBranchId', branchToActivate.id);
+
+        if (user?.role === 'owner') {
+           const storedBranchId = localStorage.getItem('activeBranchId');
+           if (storedBranchId === ALL_BRANCHES_ID) {
+              setActiveBranchState(allBranchesOption);
+           } else {
+             const branchToActivate = branchData.find(b => b.id === storedBranchId) || allBranchesOption;
+             setActiveBranchState(branchToActivate);
+           }
+        } else if (user?.role === 'admin' && user.branchId) {
+            const assignedBranch = branchData.find(b => b.id === user.branchId);
+            setActiveBranchState(assignedBranch || null);
         }
 
       } catch (error) {
@@ -50,17 +65,15 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
     fetchBranches();
-  }, []);
+  }, [user, authLoading]);
 
-  const setActiveBranch = (branch: Branch | null) => {
+  const setActiveBranch = (branch: Branch | { id: string, name: string } | null) => {
     setActiveBranchState(branch);
     if (branch) {
       localStorage.setItem('activeBranchId', branch.id);
     } else {
       localStorage.removeItem('activeBranchId');
     }
-    // A simple way to trigger a re-fetch in all pages
-    window.location.reload();
   };
   
   const handleAddBranch = async (name: string) => {
@@ -68,7 +81,20 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setBranches(prev => [...prev, newBranch]);
   };
 
-  const value = useMemo(() => ({ branches, activeBranch, setActiveBranch, loading, addBranch: handleAddBranch }), [branches, activeBranch, loading]);
+  const getBranchName = useCallback((branchId: string) => {
+    return branches.find(b => b.id === branchId)?.name || 'N/A';
+  }, [branches]);
+
+
+  const value = useMemo(() => ({ 
+      branches, 
+      activeBranch, 
+      setActiveBranch, 
+      loading: loading || authLoading, 
+      addBranch: handleAddBranch,
+      allBranchesOption,
+      getBranchName,
+    }), [branches, activeBranch, loading, authLoading, getBranchName]);
 
   return (
     <BranchContext.Provider value={value}>
@@ -84,3 +110,4 @@ export const useBranch = () => {
   }
   return context;
 };
+
