@@ -253,7 +253,7 @@ export default function KasUmumPage() {
   const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredKasList.map(k => ({
         'Tanggal': format(new Date(k.date), 'dd/MM/yyyy'),
-        'Cabang': getBranchName(k.branchId),
+        'Kabupaten': user?.role === 'owner' ? getBranchName(k.branchId) : undefined,
         'Uraian': k.description,
         'Debit': k.type === 'debit' ? k.total : 0,
         'Kredit': k.type === 'credit' ? k.total : 0,
@@ -267,15 +267,20 @@ export default function KasUmumPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = [['Tanggal', 'Cabang', 'Uraian', 'Debit', 'Kredit', 'Saldo']];
-    const data = sortedAndFilteredKasList.map(k => [
-        format(new Date(k.date), 'dd/MM/yyyy'),
-        getBranchName(k.branchId),
-        k.description,
-        k.type === 'debit' ? formatCurrency(k.total) : '',
-        k.type === 'credit' ? formatCurrency(k.total) : '',
-        formatCurrency(k.balance)
-    ]);
+    const headers = user?.role === 'owner' 
+        ? [['Tanggal', 'Kabupaten', 'Uraian', 'Debit', 'Kredit', 'Saldo']]
+        : [['Tanggal', 'Uraian', 'Debit', 'Kredit', 'Saldo']];
+
+    const data = sortedAndFilteredKasList.map(k => {
+        const commonData = [
+            format(new Date(k.date), 'dd/MM/yyyy'),
+            k.description,
+            k.type === 'debit' ? formatCurrency(k.total) : '',
+            k.type === 'credit' ? formatCurrency(k.total) : '',
+            formatCurrency(k.balance)
+        ];
+        return user?.role === 'owner' ? [commonData[0], getBranchName(k.branchId), ...commonData.slice(1)] : commonData;
+    });
     exportToPdf('Data Kas Umum', headers, data);
     toast({ title: 'Sukses', description: 'Data kas umum berhasil diekspor ke PDF.' });
   };
@@ -301,9 +306,13 @@ export default function KasUmumPage() {
             const newKasItems: KasUmumInput[] = [];
             for (const item of json) {
                 const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
-                const branchId = branchNameToIdMap[item['Cabang']];
+                
+                const branchId = activeBranch?.id === 'all'
+                    ? branchNameToIdMap[item['Kabupaten']]
+                    : activeBranch?.id;
+
                 if (!branchId) {
-                  console.warn(`Branch not found for: ${item['Cabang']}`);
+                  console.warn(`Branch not found for: ${item['Kabupaten']}`);
                   continue;
                 }
 
@@ -445,7 +454,7 @@ export default function KasUmumPage() {
                   />
                 </TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Cabang <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
+                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('description')}>Uraian <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right px-2">Debit</TableHead>
                 <TableHead className="text-right px-2">Kredit</TableHead>
@@ -565,3 +574,5 @@ export default function KasUmumPage() {
     </div>
   );
 }
+
+    

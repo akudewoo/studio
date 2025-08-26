@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
+import { useAuth } from '@/hooks/use-auth';
 
 
 const doReleaseSchema = z.object({
@@ -54,12 +55,13 @@ const doReleaseImportSchema = doReleaseSchema.extend({
 });
 
 type SortConfig = {
-  key: keyof DORelease | 'productName' | 'sisaPenebusan';
+  key: keyof DORelease | 'productName' | 'sisaPenebusan' | 'branchName';
   direction: 'ascending' | 'descending';
 } | null;
 
 export default function PengeluaranDOPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
+  const { user } = useAuth();
+  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -140,6 +142,9 @@ export default function PengeluaranDOPage() {
         } else if (sortConfig.key === 'sisaPenebusan') {
             aValue = sisaPenebusanByDO[a.doNumber] ?? 0;
             bValue = sisaPenebusanByDO[b.doNumber] ?? 0;
+        } else if (sortConfig.key === 'branchName') {
+            aValue = redemptionA ? getBranchName(redemptionA.branchId) : '';
+            bValue = redemptionB ? getBranchName(redemptionB.branchId) : '';
         } else {
             aValue = a[sortConfig.key as keyof DORelease];
             bValue = b[sortConfig.key as keyof DORelease];
@@ -156,9 +161,9 @@ export default function PengeluaranDOPage() {
     }
 
     return filterableReleases;
-  }, [doReleases, searchQuery, sortConfig, redemptionMap, productMap, sisaPenebusanByDO]);
+  }, [doReleases, searchQuery, sortConfig, redemptionMap, productMap, sisaPenebusanByDO, getBranchName]);
 
-  const requestSort = (key: keyof DORelease | 'productName' | 'sisaPenebusan') => {
+  const requestSort = (key: keyof DORelease | 'productName' | 'sisaPenebusan' | 'branchName') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -244,7 +249,10 @@ export default function PengeluaranDOPage() {
 
 
   const onSubmit = async (values: z.infer<typeof doReleaseSchema>) => {
-    if (!activeBranch) return;
+    if (!activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
+        return;
+    }
 
     const redemption = redemptionMap[values.doNumber];
     if (!redemption) {
@@ -306,6 +314,7 @@ export default function PengeluaranDOPage() {
         return {
             'NO DO': r.doNumber,
             'Tanggal': format(new Date(r.date), 'dd/MM/yyyy'),
+            'Kabupaten': user?.role === 'owner' ? getBranchName(redemption.branchId) : undefined,
             'Nama Produk': product?.name || 'N/A',
             'QTY DO': r.quantity,
             'QTY Penebusan': r.redemptionQuantity,
@@ -323,12 +332,15 @@ export default function PengeluaranDOPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = [['NO DO', 'Tanggal', 'Nama Produk', 'QTY DO', 'QTY Penebusan', 'Sisa Penebusan']];
+    const headers = user?.role === 'owner'
+        ? [['NO DO', 'Tanggal', 'Kabupaten', 'Nama Produk', 'QTY DO', 'QTY Penebusan', 'Sisa Penebusan']]
+        : [['NO DO', 'Tanggal', 'Nama Produk', 'QTY DO', 'QTY Penebusan', 'Sisa Penebusan']];
+
     const data = sortedAndFilteredDoReleases.map(r => {
       const redemption = redemptionMap[r.doNumber];
       const product = redemption ? productMap[redemption.productId] : null;
       const sisa = sisaPenebusanByDO[r.doNumber] ?? 0;
-      return [
+      const commonData = [
         r.doNumber,
         format(new Date(r.date), 'dd/MM/yyyy'),
         product?.name || 'N/A',
@@ -336,6 +348,7 @@ export default function PengeluaranDOPage() {
         r.redemptionQuantity.toLocaleString('id-ID'),
         sisa.toLocaleString('id-ID')
       ];
+      return user?.role === 'owner' ? [commonData[0], commonData[1], redemption ? getBranchName(redemption.branchId) : 'N/A', ...commonData.slice(2)] : commonData;
     });
     exportToPdf('Data Pengeluaran DO', headers, data);
     toast({
@@ -346,7 +359,10 @@ export default function PengeluaranDOPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !activeBranch) return;
+    if (!file || !activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -496,6 +512,7 @@ export default function PengeluaranDOPage() {
                 </TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('redemptionQuantity')}>QTY Penebusan <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
@@ -520,6 +537,7 @@ export default function PengeluaranDOPage() {
                     </TableCell>
                     <TableCell className="font-medium px-2">{release.doNumber}</TableCell>
                     <TableCell className="px-2">{format(new Date(release.date), 'dd/MM/yyyy')}</TableCell>
+                    {user?.role === 'owner' && <TableCell className="px-2">{redemption ? getBranchName(redemption.branchId) : 'N/A'}</TableCell>}
                     <TableCell className="px-2">{product?.name || 'N/A'}</TableCell>
                     <TableCell className="text-center px-2">{release.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-center px-2">{release.redemptionQuantity.toLocaleString('id-ID')}</TableCell>
@@ -619,3 +637,5 @@ export default function PengeluaranDOPage() {
     </div>
   );
 }
+
+    

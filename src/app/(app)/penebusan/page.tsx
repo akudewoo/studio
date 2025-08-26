@@ -40,6 +40,7 @@ import { getProducts } from '@/services/productService';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
+import { useAuth } from '@/hooks/use-auth';
 
 const redemptionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus diisi' }),
@@ -50,12 +51,13 @@ const redemptionSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof Redemption | 'productName' | 'total';
+  key: keyof Redemption | 'productName' | 'total' | 'branchName';
   direction: 'ascending' | 'descending';
 } | null;
 
 export default function PenebusanPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
+  const { user } = useAuth();
+  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -123,6 +125,9 @@ export default function PenebusanPage() {
             const productB = productMap[b.productId];
             aValue = productA ? productA.purchasePrice * a.quantity : 0;
             bValue = productB ? productB.purchasePrice * b.quantity : 0;
+        } else if (sortConfig.key === 'branchName') {
+            aValue = getBranchName(a.branchId);
+            bValue = getBranchName(b.branchId);
         } else {
             aValue = a[sortConfig.key as keyof Redemption];
             bValue = b[sortConfig.key as keyof Redemption];
@@ -139,9 +144,9 @@ export default function PenebusanPage() {
     }
 
     return filterableRedemptions;
-  }, [redemptions, searchQuery, groupFilter, sortConfig, productMap]);
+  }, [redemptions, searchQuery, groupFilter, sortConfig, productMap, getBranchName]);
 
-  const requestSort = (key: keyof Redemption | 'productName' | 'total') => {
+  const requestSort = (key: keyof Redemption | 'productName' | 'total' | 'branchName') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -235,7 +240,10 @@ export default function PenebusanPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof redemptionSchema>) => {
-    if (!activeBranch) return;
+    if (!activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
+        return;
+    }
     const redemptionData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
     try {
       if (editingRedemption) {
@@ -292,6 +300,7 @@ export default function PenebusanPage() {
             'NO DO': r.doNumber,
             'Supplier': r.supplier,
             'Tanggal': format(new Date(r.date), 'dd/MM/yyyy'),
+            'Kabupaten': user?.role === 'owner' ? getBranchName(r.branchId) : undefined,
             'Nama Produk': product?.name || 'N/A',
             'QTY': r.quantity,
             'Total': total
@@ -308,11 +317,14 @@ export default function PenebusanPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = [['NO DO', 'Supplier', 'Tanggal', 'Nama Produk', 'QTY', 'Total']];
+    const headers = user?.role === 'owner'
+        ? [['NO DO', 'Supplier', 'Tanggal', 'Kabupaten', 'Nama Produk', 'QTY', 'Total']]
+        : [['NO DO', 'Supplier', 'Tanggal', 'Nama Produk', 'QTY', 'Total']];
+
     const data = sortedAndFilteredRedemptions.map(r => {
       const product = productMap[r.productId];
       const total = product ? product.purchasePrice * r.quantity : 0;
-      return [
+      const commonData = [
         r.doNumber,
         r.supplier,
         format(new Date(r.date), 'dd/MM/yyyy'),
@@ -320,6 +332,7 @@ export default function PenebusanPage() {
         r.quantity.toLocaleString('id-ID'),
         formatCurrency(total)
       ];
+      return user?.role === 'owner' ? [commonData[0], commonData[1], commonData[2], getBranchName(r.branchId), ...commonData.slice(3)] : commonData;
     });
     exportToPdf('Data Penebusan', headers, data);
     toast({
@@ -330,7 +343,10 @@ export default function PenebusanPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !activeBranch) return;
+    if (!file || !activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -517,6 +533,7 @@ export default function PenebusanPage() {
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('supplier')}>Supplier <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('total')}>Total <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
@@ -539,6 +556,7 @@ export default function PenebusanPage() {
                     <TableCell className="font-medium px-2">{redemption.doNumber}</TableCell>
                     <TableCell className="px-2">{redemption.supplier}</TableCell>
                     <TableCell className="px-2">{format(new Date(redemption.date), 'dd/MM/yyyy')}</TableCell>
+                    {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(redemption.branchId)}</TableCell>}
                     <TableCell className="px-2">{product?.name || 'Produk tidak ditemukan'}</TableCell>
                     <TableCell className="text-center px-2">{redemption.quantity.toLocaleString('id-ID')}</TableCell>
                     <TableCell className="text-right px-2">{formatCurrency(total)}</TableCell>
@@ -667,3 +685,5 @@ export default function PenebusanPage() {
     </div>
   );
 }
+
+    

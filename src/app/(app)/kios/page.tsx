@@ -40,6 +40,7 @@ import { getRedemptions } from '@/services/redemptionService';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
+import { useAuth } from '@/hooks/use-auth';
 
 
 const kioskSchema = z.object({
@@ -52,12 +53,13 @@ const kioskSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof Kiosk | 'totalBills';
+  key: keyof Kiosk | 'totalBills' | 'branchName';
   direction: 'ascending' | 'descending';
 } | null;
 
 export default function KiosPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
+  const { user } = useAuth();
+  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -145,6 +147,9 @@ export default function KiosPage() {
         if (sortConfig.key === 'totalBills') {
           aValue = totalBills[a.id] || 0;
           bValue = totalBills[b.id] || 0;
+        } else if (sortConfig.key === 'branchName') {
+            aValue = getBranchName(a.branchId);
+            bValue = getBranchName(b.branchId);
         } else {
           aValue = a[sortConfig.key as keyof Kiosk];
           bValue = b[sortConfig.key as keyof Kiosk];
@@ -161,9 +166,9 @@ export default function KiosPage() {
     }
 
     return filterableKiosks;
-  }, [kiosks, searchQuery, groupFilter, sortConfig, totalBills]);
+  }, [kiosks, searchQuery, groupFilter, sortConfig, totalBills, getBranchName]);
 
-  const requestSort = (key: keyof Kiosk | 'totalBills') => {
+  const requestSort = (key: keyof Kiosk | 'totalBills' | 'branchName') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -257,7 +262,10 @@ export default function KiosPage() {
 
 
   const onSubmit = async (values: z.infer<typeof kioskSchema>) => {
-    if (!activeBranch) return;
+    if (!activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
+        return;
+    }
     try {
       if (editingKiosk) {
         await updateKiosk(editingKiosk.id, values);
@@ -306,6 +314,7 @@ export default function KiosPage() {
   const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredKiosks.map(k => ({
         'Nama Kios': k.name,
+        'Kabupaten': user?.role === 'owner' ? getBranchName(k.branchId) : undefined,
         'Penanggung Jawab': k.penanggungJawab,
         'Alamat': k.address,
         'Desa': k.desa,
@@ -324,16 +333,21 @@ export default function KiosPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = [['Nama Kios', 'Penanggung Jawab', 'Alamat', 'Desa', 'Kecamatan', 'No. Telepon', 'Tagihan Total']];
-    const data = sortedAndFilteredKiosks.map(k => [
-        k.name,
-        k.penanggungJawab,
-        k.address,
-        k.desa,
-        k.kecamatan,
-        k.phone,
-        formatCurrency(totalBills[k.id] || 0)
-    ]);
+    const headers = user?.role === 'owner'
+        ? [['Nama Kios', 'Kabupaten', 'Penanggung Jawab', 'Alamat', 'Desa', 'Kecamatan', 'No. Telepon', 'Tagihan Total']]
+        : [['Nama Kios', 'Penanggung Jawab', 'Alamat', 'Desa', 'Kecamatan', 'No. Telepon', 'Tagihan Total']];
+    const data = sortedAndFilteredKiosks.map(k => {
+        const commonData = [
+            k.name,
+            k.penanggungJawab,
+            k.address,
+            k.desa,
+            k.kecamatan,
+            k.phone,
+            formatCurrency(totalBills[k.id] || 0)
+        ];
+        return user?.role === 'owner' ? [k.name, getBranchName(k.branchId), ...commonData.slice(1)] : commonData;
+    });
 
     exportToPdf('Data Kios', headers, data);
     toast({
@@ -344,7 +358,10 @@ export default function KiosPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !activeBranch) return;
+    if (!file || !activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -514,6 +531,7 @@ export default function KiosPage() {
                   />
                 </TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('name')}>Nama Kios <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('penanggungJawab')}>Penanggung Jawab <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('address')}>Alamat <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('desa')}>Desa <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
@@ -541,6 +559,7 @@ export default function KiosPage() {
                     />
                   </TableCell>
                   <TableCell className="font-medium px-2">{kiosk.name}</TableCell>
+                  {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(kiosk.branchId)}</TableCell>}
                   <TableCell className="px-2">{kiosk.penanggungJawab}</TableCell>
                   <TableCell className="px-2">{kiosk.address}</TableCell>
                   <TableCell className="px-2">{kiosk.desa}</TableCell>
@@ -685,3 +704,5 @@ export default function KiosPage() {
     </div>
   );
 }
+
+    

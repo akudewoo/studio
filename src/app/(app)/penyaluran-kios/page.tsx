@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
+import { useAuth } from '@/hooks/use-auth';
 
 const distributionSchema = z.object({
   doNumber: z.string().min(1, { message: 'NO DO harus dipilih' }),
@@ -54,12 +55,13 @@ const distributionSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'paymentTempo' | 'kurangBayar';
+  key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'paymentTempo' | 'kurangBayar' | 'branchName';
   direction: 'ascending' | 'descending';
 } | null;
 
 export default function PenyaluranKiosPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
+  const { user } = useAuth();
+  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -156,6 +158,10 @@ export default function PenyaluranKiosPage() {
                 const totalB = productB ? b.quantity * productB.sellPrice : 0;
                 bValue = totalB - b.directPayment - paymentTempoB;
                 break;
+            case 'branchName':
+                 aValue = getBranchName(a.branchId);
+                 bValue = getBranchName(b.branchId);
+                 break;
             default:
                 aValue = a[sortConfig.key as keyof KioskDistribution];
                 bValue = b[sortConfig.key as keyof KioskDistribution];
@@ -172,9 +178,9 @@ export default function PenyaluranKiosPage() {
     }
 
     return filterableDistributions;
-  }, [distributions, searchQuery, groupFilter, sortConfig, kiosks, redemptions, products, payments]);
+  }, [distributions, searchQuery, groupFilter, sortConfig, kiosks, redemptions, products, payments, getBranchName]);
 
-  const requestSort = (key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'paymentTempo' | 'kurangBayar') => {
+  const requestSort = (key: keyof KioskDistribution | 'productName' | 'kioskName' | 'total' | 'paymentTempo' | 'kurangBayar' | 'branchName') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -236,11 +242,11 @@ export default function PenyaluranKiosPage() {
   }, [products]);
   
   const doOptions = useMemo(() => {
-    return redemptions.map(r => ({
+    return doReleases.map(r => ({
       value: r.doNumber,
-      label: `${r.doNumber} (${productMap[r.productId]?.name || 'N/A'})`,
+      label: `${r.doNumber} (${getDetails(r.doNumber).product?.name || 'N/A'})`,
     }));
-  }, [redemptions, productMap]);
+  }, [doReleases, products, redemptions]);
 
   const handleDialogOpen = (dist: KioskDistribution | null) => {
     setEditingDist(dist);
@@ -279,15 +285,16 @@ export default function PenyaluranKiosPage() {
 
 
   const onSubmit = async (values: z.infer<typeof distributionSchema>) => {
-    if (!activeBranch) return;
+    if (!activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
+        return;
+    }
     const { doRelease } = getDetails(values.doNumber);
-    const distributedQty = distributions.filter(d => d.doNumber === values.doNumber).reduce((sum, d) => sum + d.quantity, 0);
+    const distributedQty = distributions.filter(d => d.doNumber === values.doNumber && d.id !== editingDist?.id).reduce((sum, d) => sum + d.quantity, 0);
 
     if (doRelease && (values.quantity + distributedQty > doRelease.quantity)) {
-        if(!editingDist || (editingDist && editingDist.doNumber !== values.doNumber)) {
-            form.setError("quantity", { type: "manual", message: `QTY melebihi sisa DO (${doRelease.quantity - distributedQty})` });
-            return;
-        }
+        form.setError("quantity", { type: "manual", message: `QTY melebihi sisa DO (${doRelease.quantity - distributedQty})` });
+        return;
     }
     
     const distributionData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
@@ -334,6 +341,7 @@ export default function PenyaluranKiosPage() {
         return {
             'NO DO': dist.doNumber,
             'Tanggal': format(new Date(dist.date), 'dd/MM/yyyy'),
+            'Kabupaten': user?.role === 'owner' ? getBranchName(dist.branchId) : undefined,
             'Nama Produk': product?.name || 'N/A',
             'Nama Kios': getKioskName(dist.kioskId),
             'QTY': dist.quantity,
@@ -355,14 +363,17 @@ export default function PenyaluranKiosPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = [['NO DO', 'Tanggal', 'Nama Produk', 'Nama Kios', 'QTY', 'Total', 'Dibayar Langsung', 'Pembayaran Tempo', 'Kurang Bayar', 'Keterangan']];
+    const headers = user?.role === 'owner'
+        ? [['NO DO', 'Tanggal', 'Kabupaten', 'Nama Produk', 'Nama Kios', 'QTY', 'Total', 'Dibayar Langsung', 'Pembayaran Tempo', 'Kurang Bayar', 'Keterangan']]
+        : [['NO DO', 'Tanggal', 'Nama Produk', 'Nama Kios', 'QTY', 'Total', 'Dibayar Langsung', 'Pembayaran Tempo', 'Kurang Bayar', 'Keterangan']];
+        
     const data = sortedAndFilteredDistributions.map(dist => {
         const { product } = getDetails(dist.doNumber);
         const total = product ? dist.quantity * product.sellPrice : 0;
         const totalTempo = payments.filter(p => p.doNumber === dist.doNumber && p.kioskId === dist.kioskId).reduce((sum, p) => sum + p.amount, 0);
         const kurangBayar = total - dist.directPayment - totalTempo;
         const keterangan = kurangBayar <= 0 ? "Lunas" : "Belum Lunas";
-        return [
+        const commonData = [
             dist.doNumber,
             format(new Date(dist.date), 'dd/MM/yyyy'),
             product?.name || 'N/A',
@@ -374,6 +385,7 @@ export default function PenyaluranKiosPage() {
             formatCurrency(kurangBayar),
             keterangan
         ];
+        return user?.role === 'owner' ? [commonData[0], commonData[1], getBranchName(dist.branchId), ...commonData.slice(2)] : commonData;
     });
     exportToPdf('Data Penyaluran Kios', headers, data);
     toast({
@@ -384,7 +396,10 @@ export default function PenyaluranKiosPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !activeBranch) return;
+    if (!file || !activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -566,6 +581,7 @@ export default function PenyaluranKiosPage() {
                 </TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
@@ -600,6 +616,7 @@ export default function PenyaluranKiosPage() {
                     </TableCell>
                     <TableCell className="font-medium px-2">{dist.doNumber}</TableCell>
                     <TableCell className="px-2">{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
+                    {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(dist.branchId)}</TableCell>}
                     <TableCell className="px-2">{product?.name || 'N/A'}</TableCell>
                     <TableCell className="px-2">{getKioskName(dist.kioskId)}</TableCell>
                     <TableCell className="text-center px-2">{dist.quantity.toLocaleString('id-ID')}</TableCell>
@@ -711,3 +728,5 @@ export default function PenyaluranKiosPage() {
     </div>
   );
 }
+
+    

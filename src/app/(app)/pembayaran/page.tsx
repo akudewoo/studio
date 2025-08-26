@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
+import { useAuth } from '@/hooks/use-auth';
 
 
 const paymentSchema = z.object({
@@ -53,7 +54,7 @@ const paymentSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof Payment | 'kioskName';
+  key: keyof Payment | 'kioskName' | 'branchName';
   direction: 'ascending' | 'descending';
 } | null;
 
@@ -93,7 +94,8 @@ function OutstandingBalanceDisplay({ control, distributions, redemptions, produc
 }
 
 export default function PembayaranPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
+  const { user } = useAuth();
+  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [distributions, setDistributions] = useState<KioskDistribution[]>([]);
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
@@ -154,6 +156,9 @@ export default function PembayaranPage() {
         if (sortConfig.key === 'kioskName') {
           aValue = getKioskName(a.kioskId);
           bValue = getKioskName(b.kioskId);
+        } else if (sortConfig.key === 'branchName') {
+            aValue = getBranchName(a.branchId);
+            bValue = getBranchName(b.branchId);
         } else {
           aValue = a[sortConfig.key as keyof Payment];
           bValue = b[sortConfig.key as keyof Payment];
@@ -170,9 +175,9 @@ export default function PembayaranPage() {
     }
 
     return filterablePayments;
-  }, [payments, searchQuery, groupFilter, sortConfig, kiosks]);
+  }, [payments, searchQuery, groupFilter, sortConfig, kiosks, getBranchName]);
   
-  const requestSort = (key: keyof Payment | 'kioskName') => {
+  const requestSort = (key: keyof Payment | 'kioskName' | 'branchName') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -276,7 +281,10 @@ export default function PembayaranPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
-    if (!activeBranch) return;
+    if (!activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
+        return;
+    }
     try {
       const paymentData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
       if (editingPayment) {
@@ -339,6 +347,7 @@ export default function PembayaranPage() {
     const dataToExport = sortedAndFilteredPayments.map(p => ({
         'Tanggal': format(new Date(p.date), 'dd/MM/yyyy'),
         'NO DO': p.doNumber,
+        'Kabupaten': user?.role === 'owner' ? getBranchName(p.branchId) : undefined,
         'Nama Kios': getKioskName(p.kioskId),
         'Total Bayar': p.amount,
     }));
@@ -353,13 +362,18 @@ export default function PembayaranPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = [['Tanggal', 'NO DO', 'Nama Kios', 'Total Bayar']];
-    const data = sortedAndFilteredPayments.map(p => [
-      format(new Date(p.date), 'dd/MM/yyyy'),
-      p.doNumber,
-      getKioskName(p.kioskId),
-      formatCurrency(p.amount)
-    ]);
+    const headers = user?.role === 'owner'
+        ? [['Tanggal', 'NO DO', 'Kabupaten', 'Nama Kios', 'Total Bayar']]
+        : [['Tanggal', 'NO DO', 'Nama Kios', 'Total Bayar']];
+    const data = sortedAndFilteredPayments.map(p => {
+        const commonData = [
+            format(new Date(p.date), 'dd/MM/yyyy'),
+            p.doNumber,
+            getKioskName(p.kioskId),
+            formatCurrency(p.amount)
+        ];
+        return user?.role === 'owner' ? [commonData[0], commonData[1], getBranchName(p.branchId), ...commonData.slice(2)] : commonData;
+    });
     exportToPdf('Data Pembayaran', headers, data);
     toast({
       title: 'Sukses',
@@ -369,7 +383,10 @@ export default function PembayaranPage() {
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !activeBranch) return;
+    if (!file || !activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -539,6 +556,7 @@ export default function PembayaranPage() {
                 </TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('amount')}>Total Bayar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="w-[40px] px-2"></TableHead>
@@ -556,6 +574,7 @@ export default function PembayaranPage() {
                   </TableCell>
                   <TableCell className="px-2">{format(new Date(payment.date), 'dd/MM/yyyy')}</TableCell>
                   <TableCell className="font-medium px-2">{payment.doNumber}</TableCell>
+                  {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(payment.branchId)}</TableCell>}
                   <TableCell className="px-2">{getKioskName(payment.kioskId)}</TableCell>
                   <TableCell className="text-right px-2">{formatCurrency(payment.amount)}</TableCell>
                   <TableCell className="px-2">
@@ -679,3 +698,5 @@ export default function PembayaranPage() {
     </div>
   );
 }
+
+    

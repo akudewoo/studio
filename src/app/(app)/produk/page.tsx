@@ -36,6 +36,7 @@ import { getRedemptions } from '@/services/redemptionService';
 import { getDOReleases } from '@/services/doReleaseService';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
+import { useAuth } from '@/hooks/use-auth';
 
 
 const productSchema = z.object({
@@ -45,12 +46,13 @@ const productSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof Product | 'stock';
+  key: keyof Product | 'stock' | 'branchName';
   direction: 'ascending' | 'descending';
 } | null;
 
 export default function ProdukPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
+  const { user } = useAuth();
+  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
   const [products, setProducts] = useState<Product[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [doReleases, setDoReleases] = useState<DORelease[]>([]);
@@ -135,6 +137,9 @@ export default function ProdukPage() {
         if (sortConfig.key === 'stock') {
           aValue = stockByProduct[a.id] || 0;
           bValue = stockByProduct[b.id] || 0;
+        } else if (sortConfig.key === 'branchName') {
+            aValue = getBranchName(a.branchId);
+            bValue = getBranchName(b.branchId);
         } else {
           aValue = a[sortConfig.key as keyof Product];
           bValue = b[sortConfig.key as keyof Product];
@@ -151,9 +156,9 @@ export default function ProdukPage() {
     }
 
     return sortableProducts;
-  }, [products, searchQuery, sortConfig, stockByProduct]);
+  }, [products, searchQuery, sortConfig, stockByProduct, getBranchName]);
 
-  const requestSort = (key: keyof Product | 'stock') => {
+  const requestSort = (key: keyof Product | 'stock' | 'branchName') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -215,7 +220,10 @@ export default function ProdukPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof productSchema>) => {
-    if (!activeBranch) return;
+    if (!activeBranch || activeBranch.id === 'all') {
+        toast({ title: 'Error', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah produk.', variant: 'destructive' });
+        return;
+    };
 
     if (editingProduct) {
       const originalProducts = [...products];
@@ -301,6 +309,7 @@ export default function ProdukPage() {
   const handleExportExcel = () => {
     const dataToExport = sortedAndFilteredProducts.map(p => ({
         'Nama Produk': p.name,
+        'Kabupaten': user?.role === 'owner' ? getBranchName(p.branchId) : undefined,
         'Harga Beli': p.purchasePrice,
         'Harga Jual': p.sellPrice,
         'Stok': stockByProduct[p.id] || 0
@@ -316,13 +325,20 @@ export default function ProdukPage() {
   };
 
   const handleExportPdf = () => {
-    const headers = [['Nama Produk', 'Harga Beli', 'Harga Jual', 'Stok']];
-    const data = sortedAndFilteredProducts.map(p => [
-      p.name,
-      formatCurrency(p.purchasePrice),
-      formatCurrency(p.sellPrice),
-      (stockByProduct[p.id] || 0).toLocaleString('id-ID')
-    ]);
+    const headers = user?.role === 'owner' 
+      ? [['Nama Produk', 'Kabupaten', 'Harga Beli', 'Harga Jual', 'Stok']]
+      : [['Nama Produk', 'Harga Beli', 'Harga Jual', 'Stok']];
+      
+    const data = sortedAndFilteredProducts.map(p => {
+        const commonData = [
+            p.name,
+            formatCurrency(p.purchasePrice),
+            formatCurrency(p.sellPrice),
+            (stockByProduct[p.id] || 0).toLocaleString('id-ID')
+        ];
+        return user?.role === 'owner' ? [p.name, getBranchName(p.branchId), ...commonData.slice(1)] : commonData;
+    });
+
     exportToPdf('Data Produk', headers, data);
     toast({
       title: 'Sukses',
@@ -331,7 +347,10 @@ export default function ProdukPage() {
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!fileInputRef.current?.files || !activeBranch) return;
+    if (!fileInputRef.current?.files || !activeBranch || activeBranch.id === 'all') {
+      toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
+      return;
+    }
     const file = fileInputRef.current.files[0];
     if (!file) return;
 
@@ -497,6 +516,14 @@ export default function ProdukPage() {
                     <ArrowUpDown className="ml-2 h-3 w-3" />
                   </Button>
                 </TableHead>
+                 {user?.role === 'owner' && (
+                  <TableHead className="px-2">
+                    <Button variant="ghost" onClick={() => requestSort('branchName')} className="text-xs px-2">
+                      Kabupaten
+                      <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                )}
                 <TableHead className="text-right px-2">
                   <Button variant="ghost" onClick={() => requestSort('purchasePrice')} className="text-xs px-2">
                     Harga Beli
@@ -529,6 +556,9 @@ export default function ProdukPage() {
                     />
                   </TableCell>
                   <TableCell className="font-medium px-2">{product.name}</TableCell>
+                   {user?.role === 'owner' && (
+                    <TableCell className="px-2">{getBranchName(product.branchId)}</TableCell>
+                  )}
                   <TableCell className="text-right px-2">
                     {formatCurrency(product.purchasePrice)}
                   </TableCell>
@@ -643,3 +673,5 @@ export default function ProdukPage() {
     </div>
   );
 }
+
+    
