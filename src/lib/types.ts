@@ -100,6 +100,7 @@ export interface KasAngkutan {
     lembur: number;
     helper: number;
     branchId: string;
+    nominal?: number;
 }
 
 // Omit 'id' when creating a new entity

@@ -65,7 +65,7 @@ const kasAngkutanSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo';
+  key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo' | 'nominal';
   direction: 'ascending' | 'descending';
 } | null;
 
@@ -119,11 +119,12 @@ export default function KasAngkutanPage() {
 
     let runningBalance = 0;
     const withBalance = filterableKas.map(kas => {
+        const nominal = kas.uangMasuk;
         const calculatedExpenses = kas.adminFee + kas.uangMakan + kas.palang + kas.solar + kas.upahSopir + kas.lembur + kas.helper;
         const totalPengeluaran = kas.type === 'pengeluaran' ? (kas.doNumber ? calculatedExpenses : kas.pengeluaran) : 0;
         const sisaUang = kas.uangMasuk - totalPengeluaran;
         runningBalance += sisaUang;
-        return { ...kas, totalPengeluaran, sisaUang, saldo: runningBalance };
+        return { ...kas, nominal, totalPengeluaran, sisaUang, saldo: runningBalance };
     });
 
     if (sortConfig !== null) {
@@ -154,7 +155,7 @@ export default function KasAngkutanPage() {
     return withBalance;
   }, [kasList, searchQuery, sortConfig, getBranchName]);
 
-  const requestSort = (key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo') => {
+  const requestSort = (key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo' | 'nominal') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -401,7 +402,7 @@ export default function KasAngkutanPage() {
                 <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('namaSopir')}>Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('uraian')}>Uraian<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 {user?.role === 'owner' && <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('branchName')}>Kab. <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
-                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('uangMasuk')}>Uang Masuk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('nominal')}>Nominal<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('adminFee')}>Admin<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('uangMakan')}>U. Makan<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('palang')}>Palang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
@@ -430,7 +431,7 @@ export default function KasAngkutanPage() {
                   <TableCell className="px-2 font-medium">{kas.namaSopir || '-'}</TableCell>
                   <TableCell className="px-2 font-medium">{kas.uraian}</TableCell>
                   {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(kas.branchId)}</TableCell>}
-                  <TableCell className="px-2 text-right font-semibold text-green-600">{kas.type === 'pemasukan' ? formatCurrency(kas.uangMasuk) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right font-semibold text-green-600">{kas.type === 'pemasukan' ? formatCurrency((kas as any).nominal) : '-'}</TableCell>
                   <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.adminFee) : '-'}</TableCell>
                   <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.uangMakan) : '-'}</TableCell>
                   <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.palang) : '-'}</TableCell>
