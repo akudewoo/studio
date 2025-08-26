@@ -22,7 +22,7 @@ interface BranchContextType {
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeBranch, setActiveBranchState] = useState<Branch | { id: string, name: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,13 +31,12 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     const fetchBranchesAndSetState = async () => {
-      if (authLoading || !user) return;
+      if (!user) return;
       setLoading(true);
       try {
         const branchData = await getBranches();
         setBranches(branchData);
 
-        // Determine the active branch based on user role
         if (user.role === 'owner') {
            const storedBranchId = localStorage.getItem('activeBranchId');
            if (storedBranchId === ALL_BRANCHES_ID) {
@@ -48,13 +47,8 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
            }
         } else if (user.role === 'admin' && user.branchId) {
             const assignedBranch = branchData.find(b => b.id === user.branchId);
-            // Fallback to the first available branch if assigned one not found
-            setActiveBranchState(assignedBranch || branchData[0] || null);
-        } else {
-            // Default for owner if nothing is stored
-            setActiveBranchState(allBranchesOption);
+            setActiveBranchState(assignedBranch || null); // Admin must have an assigned branch
         }
-
       } catch (error) {
         console.error("Failed to fetch branches:", error);
       } finally {
@@ -62,13 +56,13 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
     fetchBranchesAndSetState();
-  }, [user, authLoading]);
+  }, [user]);
 
   const setActiveBranch = (branch: Branch | { id: string, name: string } | null) => {
     setActiveBranchState(branch);
-    if (branch) {
+    if (branch && user?.role === 'owner') {
       localStorage.setItem('activeBranchId', branch.id);
-    } else {
+    } else if (user?.role === 'owner') {
       localStorage.removeItem('activeBranchId');
     }
   };
@@ -83,16 +77,15 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return branches.find(b => b.id === branchId)?.name || 'N/A';
   }, [branches]);
 
-
   const value = useMemo(() => ({ 
       branches, 
       activeBranch, 
       setActiveBranch, 
-      loading: loading || authLoading, 
+      loading,
       addBranch: handleAddBranch,
       allBranchesOption,
       getBranchName,
-    }), [branches, activeBranch, loading, authLoading, getBranchName]);
+    }), [branches, activeBranch, loading, getBranchName]);
 
   return (
     <BranchContext.Provider value={value}>

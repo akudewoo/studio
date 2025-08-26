@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import type { KasUmum, KasUmumInput, Branch } from '@/lib/types';
+import type { KasUmum, KasUmumInput } from '@/lib/types';
 import { getKasUmum, addKasUmum, updateKasUmum, deleteKasUmum, deleteMultipleKasUmum, addMultipleKasUmum } from '@/services/kasUmumService';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
@@ -173,7 +173,7 @@ export default function KasUmumPage() {
     if (user?.role === 'admin' && user.branchId) {
         form.setValue('branchId', user.branchId);
     }
-  }, [activeBranch, user, form]);
+  }, [activeBranch, user, form, isDialogOpen]);
 
   const handleDialogOpen = (kas: KasUmum | null) => {
     setEditingKas(kas);
@@ -189,7 +189,7 @@ export default function KasUmumPage() {
         type: 'debit',
         quantity: 1,
         unitPrice: 0,
-        branchId: user?.role === 'admin' ? user.branchId : activeBranch?.id === 'all' ? '' : activeBranch?.id,
+        branchId: user?.role === 'admin' ? user.branchId : (activeBranch?.id === 'all' ? '' : activeBranch?.id),
       });
     }
     setIsDialogOpen(true);
@@ -221,7 +221,7 @@ export default function KasUmumPage() {
       const kasData = { ...values, date: values.date.toISOString() };
       if (editingKas) {
         await updateKasUmum(editingKas.id, kasData);
-        setKasList(kasList.map((k) => (k.id === editingKas.id ? { id: k.id, total: kasData.quantity * kasData.unitPrice, ...kasData } : k)));
+        setKasList(kasList.map((k) => (k.id === editingKas.id ? { id: k.id, total: kasData.quantity * kasData.unitPrice, balance: 0, ...kasData } : k)));
         toast({ title: 'Sukses', description: 'Data kas berhasil diperbarui.' });
       } else {
         const newKas = await addKasUmum(kasData);
@@ -325,6 +325,7 @@ export default function KasUmumPage() {
                     newKasItems.push({
                       ...parsed.data,
                       date: parsed.data.date.toISOString(),
+                      total: 0,
                     });
                 } else {
                     console.warn('Invalid item skipped:', item, parsed.error);

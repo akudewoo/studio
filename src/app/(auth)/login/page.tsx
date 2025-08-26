@@ -1,8 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -28,57 +27,35 @@ import { useToast } from '@/hooks/use-toast';
 import { Logo } from '@/components/icons/logo';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Format email tidak valid' }),
-  password: z.string().min(6, { message: 'Password minimal 6 karakter' }),
+  username: z.string().min(1, { message: 'Username harus diisi' }),
+  password: z.string().min(1, { message: 'Password harus diisi' }),
 });
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { login, user, loading } = useAuth();
+  const { login } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!loading && user) {
-      router.push('/dashboard');
-    }
-  }, [user, loading, router]);
-
-
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { username: '', password: '' },
   });
 
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
     try {
-      await login(values.email, values.password);
-      toast({
-        title: 'Login Berhasil',
-        description: 'Anda akan diarahkan ke dasbor.',
-      });
-      router.push('/dashboard');
+      await login(values.username, values.password);
+      // The redirection is handled by the AuthProvider
     } catch (error: any) {
       toast({
         title: 'Login Gagal',
-        description: error.message || 'Email atau password salah.',
+        description: error.message || 'Username atau password salah.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
-  
-  if (loading || user) {
-    return (
-        <div className="flex h-screen w-full items-center justify-center">
-            <div className="text-center">
-                <p>Loading...</p>
-            </div>
-        </div>
-    );
-  }
 
   return (
     <Card className="w-full max-w-sm">
@@ -96,14 +73,13 @@ export default function LoginPage() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="email"
+              name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Username</FormLabel>
                   <FormControl>
                     <Input
-                      type="email"
-                      placeholder="admin@example.com"
+                      placeholder="Username"
                       {...field}
                     />
                   </FormControl>

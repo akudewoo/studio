@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { BranchProvider, useBranch } from '@/hooks/use-branch';
-import { AuthProvider, useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -135,13 +135,7 @@ const AppSidebar = () => {
     const pathname = usePathname();
     const { isMobile } = useSidebar();
     const { user, logout } = useAuth();
-    const router = useRouter();
-
-    const handleLogout = async () => {
-        await logout();
-        router.push('/login');
-    }
-
+    
     return (
         <Sidebar
             collapsible={isMobile ? 'offcanvas' : 'icon'}
@@ -183,9 +177,9 @@ const AppSidebar = () => {
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton onClick={handleLogout} tooltip={{ children: "Logout" }}>
+                        <SidebarMenuButton onClick={logout} tooltip={{ children: "Logout" }}>
                             <LogOut />
-                            <span>Logout ({user?.email})</span>
+                            <span>Logout ({user?.username})</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
@@ -196,14 +190,7 @@ const AppSidebar = () => {
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
-    const router = useRouter();
     
-    React.useEffect(() => {
-        if (!loading && !user) {
-            router.push('/login');
-        }
-    }, [user, loading, router]);
-
     if (loading || !user) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
@@ -230,11 +217,12 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
     );
 }
 
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-    return (
-        <AuthProvider>
-            <ProtectedLayout>{children}</ProtectedLayout>
-        </AuthProvider>
-    );
+  return (
+      <AuthProvider>
+          <ProtectedLayout>
+              {children}
+          </ProtectedLayout>
+      </AuthProvider>
+  );
 }

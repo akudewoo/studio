@@ -1,8 +1,10 @@
-import { User as FirebaseUser } from 'firebase/auth';
 
-export interface AppUser extends FirebaseUser {
-  role?: 'owner' | 'admin';
+export interface AppUser {
+  uid: string;
+  username: string;
+  role: 'owner' | 'admin';
   branchId?: string;
+  branchName?: string;
 }
 
 export interface Branch {
