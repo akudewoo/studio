@@ -585,6 +585,7 @@ export default function PenyaluranKiosPage() {
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
+                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('productName')}>Nama Produk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('kioskName')}>Nama Kios<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('namaSopir')}>Nama Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-center px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('quantity')}>QTY<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
@@ -620,6 +621,7 @@ export default function PenyaluranKiosPage() {
                     <TableCell className="font-medium px-2">{dist.doNumber}</TableCell>
                     <TableCell className="px-2">{format(new Date(dist.date), 'dd/MM/yyyy')}</TableCell>
                     {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(dist.branchId)}</TableCell>}
+                    <TableCell className="px-2">{product?.name || 'N/A'}</TableCell>
                     <TableCell className="px-2">{getKioskName(dist.kioskId)}</TableCell>
                     <TableCell className="px-2">{dist.namaSopir}</TableCell>
                     <TableCell className="text-center px-2">{dist.quantity.toLocaleString('id-ID')}</TableCell>
@@ -737,3 +739,5 @@ export default function PenyaluranKiosPage() {
     </div>
   );
 }
+
+    
