@@ -356,8 +356,8 @@ export default function KasAngkutanPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-          <Table className="text-xs whitespace-nowrap">
-            <TableHeader className="sticky top-0 bg-background z-10">
+          <Table className="whitespace-nowrap text-xs">
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                  <TableHead className="w-[40px] px-2">
                    <Checkbox
@@ -366,22 +366,22 @@ export default function KasAngkutanPage() {
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('date')}>Tgl <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('namaSopir')}>Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('uraian')}>Uraian<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                {user?.role === 'owner' && <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('branchName')}>Kab. <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('uangMasuk')}>Uang Masuk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('adminFee')}>Admin<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('uangMakan')}>U. Makan<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('palang')}>Palang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('solar')}>Solar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('upahSopir')}>U. Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('lembur')}>Lembur<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('helper')}>Helper<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('totalPengeluaran')}>Total Keluar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('sisaUang')}>Sisa Uang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('saldo')}>Saldo<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('date')}>Tgl <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('namaSopir')}>Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('uraian')}>Uraian<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                {user?.role === 'owner' && <TableHead><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('branchName')}>Kab. <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('uangMasuk')}>Uang Masuk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('adminFee')}>Admin<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('uangMakan')}>U. Makan<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('palang')}>Palang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('solar')}>Solar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('upahSopir')}>U. Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('lembur')}>Lembur<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('helper')}>Helper<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('totalPengeluaran')}>Total Keluar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('sisaUang')}>Sisa Uang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('saldo')}>Saldo<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
@@ -396,21 +396,21 @@ export default function KasAngkutanPage() {
                     />
                   </TableCell>
                   <TableCell className="px-2">{format(new Date(kas.date), 'dd/MM/yy')}</TableCell>
-                  <TableCell className="font-medium px-2">{kas.doNumber || '-'}</TableCell>
-                  <TableCell className="font-medium px-2">{kas.namaSopir || '-'}</TableCell>
-                  <TableCell className="font-medium px-2">{kas.uraian}</TableCell>
+                  <TableCell className="px-2 font-medium">{kas.doNumber || '-'}</TableCell>
+                  <TableCell className="px-2 font-medium">{kas.namaSopir || '-'}</TableCell>
+                  <TableCell className="px-2 font-medium">{kas.uraian}</TableCell>
                   {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(kas.branchId)}</TableCell>}
-                  <TableCell className="text-right px-2 text-green-600 font-semibold">{kas.type === 'pemasukan' ? formatCurrency(kas.uangMasuk) : '-'}</TableCell>
-                  <TableCell className="text-right px-2">{formatCurrency(kas.adminFee)}</TableCell>
-                  <TableCell className="text-right px-2">{formatCurrency(kas.uangMakan)}</TableCell>
-                  <TableCell className="text-right px-2">{formatCurrency(kas.palang)}</TableCell>
-                  <TableCell className="text-right px-2">{formatCurrency(kas.solar)}</TableCell>
-                  <TableCell className="text-right px-2">{formatCurrency(kas.upahSopir)}</TableCell>
-                  <TableCell className="text-right px-2">{formatCurrency(kas.lembur)}</TableCell>
-                  <TableCell className="text-right px-2">{formatCurrency(kas.helper)}</TableCell>
-                  <TableCell className="text-right px-2 text-red-600 font-semibold">{formatCurrency((kas as any).totalPengeluaran)}</TableCell>
-                  <TableCell className="text-right px-2 font-bold">{formatCurrency((kas as any).sisaUang)}</TableCell>
-                  <TableCell className="text-right px-2 font-bold">{formatCurrency((kas as any).saldo)}</TableCell>
+                  <TableCell className="px-2 text-right font-semibold text-green-600">{kas.type === 'pemasukan' ? formatCurrency(kas.uangMasuk) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right">{formatCurrency(kas.adminFee)}</TableCell>
+                  <TableCell className="px-2 text-right">{formatCurrency(kas.uangMakan)}</TableCell>
+                  <TableCell className="px-2 text-right">{formatCurrency(kas.palang)}</TableCell>
+                  <TableCell className="px-2 text-right">{formatCurrency(kas.solar)}</TableCell>
+                  <TableCell className="px-2 text-right">{formatCurrency(kas.upahSopir)}</TableCell>
+                  <TableCell className="px-2 text-right">{formatCurrency(kas.lembur)}</TableCell>
+                  <TableCell className="px-2 text-right">{formatCurrency(kas.helper)}</TableCell>
+                  <TableCell className="px-2 text-right font-semibold text-red-600">{formatCurrency((kas as any).totalPengeluaran)}</TableCell>
+                  <TableCell className="px-2 text-right font-bold">{formatCurrency((kas as any).sisaUang)}</TableCell>
+                  <TableCell className="px-2 text-right font-bold">{formatCurrency((kas as any).saldo)}</TableCell>
                   <TableCell className="px-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -452,11 +452,11 @@ export default function KasAngkutanPage() {
                               >
                                   <FormItem className="flex items-center space-x-2">
                                       <FormControl><RadioGroupItem value="pemasukan" id="pemasukan" /></FormControl>
-                                      <FormLabel htmlFor="pemasukan" className="font-normal cursor-pointer">Pemasukan</FormLabel>
+                                      <FormLabel htmlFor="pemasukan" className="cursor-pointer font-normal">Pemasukan</FormLabel>
                                   </FormItem>
                                   <FormItem className="flex items-center space-x-2">
                                       <FormControl><RadioGroupItem value="pengeluaran" id="pengeluaran" /></FormControl>
-                                      <FormLabel htmlFor="pengeluaran" className="font-normal cursor-pointer">Pengeluaran</FormLabel>
+                                      <FormLabel htmlFor="pengeluaran" className="cursor-pointer font-normal">Pengeluaran</FormLabel>
                                   </FormItem>
                               </RadioGroup>
                           </FormControl>
