@@ -197,12 +197,7 @@ const AppSidebar = () => {
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
     const router = useRouter();
-    const [mounted, setMounted] = React.useState(false);
-
-    React.useEffect(() => {
-        setMounted(true);
-    }, []);
-
+    
     React.useEffect(() => {
         if (!loading && !user) {
             router.push('/login');
@@ -222,7 +217,7 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
     return (
         <BranchProvider>
             <SidebarProvider>
-                {mounted ? <AppSidebar /> : null}
+                 <AppSidebar />
                 <SidebarInset>
                     <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
                         <SidebarTrigger />

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,9 +34,16 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, loading, router]);
+
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -62,6 +69,16 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+  
+  if (loading || user) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <div className="text-center">
+                <p>Loading...</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <Card className="w-full max-w-sm">
@@ -116,3 +133,4 @@ export default function LoginPage() {
     </Card>
   );
 }
+
