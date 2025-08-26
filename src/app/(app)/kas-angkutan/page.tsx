@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -47,11 +47,18 @@ const kasAngkutanSchema = z.object({
   distributionId: z.string().optional(),
   uraian: z.string().min(1, { message: 'Uraian harus diisi' }),
 }).superRefine((data, ctx) => {
-    if (data.type === 'pemasukan' && !data.distributionId) {
+    if (data.type === 'pengeluaran' && !data.distributionId) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['distributionId'],
-            message: 'Distribusi (NO DO - Sopir) harus dipilih untuk Pemasukan',
+            message: 'Distribusi (NO DO - Sopir) harus dipilih untuk Pengeluaran',
+        });
+    }
+    if (data.type === 'pemasukan' && data.uangMasuk <= 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['uangMasuk'],
+            message: 'Uang Masuk harus lebih dari 0 untuk Pemasukan',
         });
     }
 });
@@ -164,15 +171,19 @@ export default function KasAngkutanPage() {
   }, [sortedAndFilteredKasList]);
 
   const distributionOptions = useMemo(() => {
-      return distributions.map(d => ({
-          value: d.id,
-          label: `${d.doNumber} - ${d.namaSopir}`
-      }))
-  }, [distributions]);
+      // Prevent already used distributions from being selected again for 'pengeluaran'
+      const usedDoNumbers = kasList.filter(k => k.type === 'pengeluaran').map(k => k.doNumber);
+      return distributions
+          .filter(d => !usedDoNumbers.includes(d.doNumber))
+          .map(d => ({
+              value: d.id,
+              label: `${d.doNumber} - ${d.namaSopir}`
+          }));
+  }, [distributions, kasList]);
 
   const form = useForm<z.infer<typeof kasAngkutanSchema>>({
     resolver: zodResolver(kasAngkutanSchema),
-    defaultValues: { type: 'pemasukan' }
+    defaultValues: { type: 'pengeluaran' }
   });
 
   const transactionType = useWatch({ control: form.control, name: 'type' });
@@ -184,12 +195,13 @@ export default function KasAngkutanPage() {
       form.reset({
         ...kas,
         date: new Date(kas.date),
+        type: kas.type,
         distributionId: dist?.id || '',
       });
     } else {
       form.reset({
         date: new Date(),
-        type: 'pemasukan',
+        type: 'pengeluaran',
         uangMasuk: 0,
         distributionId: '',
         uraian: '',
@@ -227,7 +239,7 @@ export default function KasAngkutanPage() {
     
     let kasData: KasAngkutanInput;
 
-    if (values.type === 'pemasukan') {
+    if (values.type === 'pengeluaran') {
         const distribution = distributions.find(d => d.id === values.distributionId);
         if (!distribution) {
           toast({ title: 'Error', description: 'Data distribusi tidak ditemukan.', variant: 'destructive' });
@@ -238,11 +250,11 @@ export default function KasAngkutanPage() {
         const jamLembur = parse('14:00', 'HH:mm', new Date());
         kasData = {
             date: values.date.toISOString(),
-            type: 'pemasukan',
-            uangMasuk: values.uangMasuk,
+            type: 'pengeluaran',
+            uangMasuk: 0, // No income for expense type
             doNumber: distribution.doNumber,
             namaSopir: distribution.namaSopir,
-            uraian: values.uraian || '',
+            uraian: values.uraian || `Biaya DO: ${distribution.doNumber}`,
             adminFee: 3125 * qty,
             uangMakan: 40000,
             palang: 5000 * qty,
@@ -252,12 +264,13 @@ export default function KasAngkutanPage() {
             helper: 5000 * qty,
             branchId: activeBranch.id,
         };
-    } else { // Pengeluaran
+    } else { // Pemasukan
         kasData = {
             date: values.date.toISOString(),
-            type: 'pengeluaran',
-            uangMasuk: 0,
+            type: 'pemasukan',
+            uangMasuk: values.uangMasuk,
             uraian: values.uraian,
+            // All expense fields are zero for income type
             adminFee: 0, uangMakan: 0, palang: 0, solar: 0, upahSopir: 0, lembur: 0, helper: 0,
             branchId: activeBranch.id,
         };
@@ -445,18 +458,27 @@ export default function KasAngkutanPage() {
                           <FormLabel>Tipe Transaksi</FormLabel>
                           <FormControl>
                               <RadioGroup
-                                  onValueChange={field.onChange}
-                                  defaultValue={field.value}
+                                  onValueChange={(value) => {
+                                      field.onChange(value);
+                                      form.reset({ // Reset other fields when type changes
+                                          ...form.getValues(),
+                                          type: value as 'pemasukan' | 'pengeluaran',
+                                          distributionId: '',
+                                          uangMasuk: 0,
+                                          uraian: ''
+                                      });
+                                  }}
+                                  value={field.value}
                                   className="flex space-x-4"
                                   disabled={!!editingKas}
                               >
                                   <FormItem className="flex items-center space-x-2">
-                                      <FormControl><RadioGroupItem value="pemasukan" id="pemasukan" /></FormControl>
-                                      <FormLabel htmlFor="pemasukan" className="cursor-pointer font-normal">Pemasukan</FormLabel>
-                                  </FormItem>
-                                  <FormItem className="flex items-center space-x-2">
                                       <FormControl><RadioGroupItem value="pengeluaran" id="pengeluaran" /></FormControl>
                                       <FormLabel htmlFor="pengeluaran" className="cursor-pointer font-normal">Pengeluaran</FormLabel>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-2">
+                                      <FormControl><RadioGroupItem value="pemasukan" id="pemasukan" /></FormControl>
+                                      <FormLabel htmlFor="pemasukan" className="cursor-pointer font-normal">Pemasukan</FormLabel>
                                   </FormItem>
                               </RadioGroup>
                           </FormControl>
@@ -487,35 +509,36 @@ export default function KasAngkutanPage() {
                   </FormItem>
                 )}
               />
+               {transactionType === 'pengeluaran' && (
+                  <FormField
+                      control={form.control}
+                      name="distributionId"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Distribusi (NO DO - Sopir)</FormLabel>
+                              <Combobox
+                                  options={distributionOptions}
+                                  value={field.value || ""}
+                                  onChange={field.onChange}
+                                  placeholder="Pilih Distribusi"
+                                  searchPlaceholder="Cari NO DO atau Sopir..."
+                                  emptyPlaceholder="Distribusi tidak ditemukan"
+                                  disabled={!!editingKas}
+                              />
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+               )}
+
                {transactionType === 'pemasukan' && (
-                <>
-                    <FormField
-                        control={form.control}
-                        name="distributionId"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Distribusi (NO DO - Sopir)</FormLabel>
-                                <Combobox
-                                    options={distributionOptions}
-                                    value={field.value || ""}
-                                    onChange={field.onChange}
-                                    placeholder="Pilih Distribusi"
-                                    searchPlaceholder="Cari NO DO atau Sopir..."
-                                    emptyPlaceholder="Distribusi tidak ditemukan"
-                                    disabled={!!editingKas}
-                                />
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField control={form.control} name="uangMasuk" render={({ field }) => (
-                      <FormItem><FormLabel>Uang Masuk</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                </>
+                  <FormField control={form.control} name="uangMasuk" render={({ field }) => (
+                    <FormItem><FormLabel>Uang Masuk</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
                )}
 
               <FormField control={form.control} name="uraian" render={({ field }) => (
-                  <FormItem><FormLabel>Uraian</FormLabel><FormControl><Input placeholder={transactionType === 'pemasukan' ? "cth. Uang jalan" : "cth. Beli ban"} {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Uraian</FormLabel><FormControl><Input placeholder={transactionType === 'pemasukan' ? "cth. Pemasukan dari kasir" : "cth. Biaya tak terduga"} {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
 
               <DialogFooter>
