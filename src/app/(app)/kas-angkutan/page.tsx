@@ -23,7 +23,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -31,6 +30,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from '@/hooks/use-toast';
 import type { KasAngkutan, KasAngkutanInput, KioskDistribution } from '@/lib/types';
 import { addKasAngkutan, getKasAngkutan, updateKasAngkutan, deleteKasAngkutan, deleteMultipleKasAngkutan } from '@/services/kasAngkutanService';
@@ -42,13 +42,22 @@ import { useAuth } from '@/hooks/use-auth';
 
 const kasAngkutanSchema = z.object({
   date: z.date({ required_error: 'Tanggal harus diisi' }),
+  type: z.enum(['pemasukan', 'pengeluaran'], { required_error: "Tipe transaksi harus dipilih"}),
   uangMasuk: z.coerce.number().min(0).default(0),
-  distributionId: z.string().min(1, { message: 'Distribusi (NO DO - Sopir) harus dipilih' }),
-  uraian: z.string().optional(),
+  distributionId: z.string().optional(),
+  uraian: z.string().min(1, { message: 'Uraian harus diisi' }),
+}).superRefine((data, ctx) => {
+    if (data.type === 'pemasukan' && !data.distributionId) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['distributionId'],
+            message: 'Distribusi (NO DO - Sopir) harus dipilih untuk Pemasukan',
+        });
+    }
 });
 
 type SortConfig = {
-  key: keyof KasAngkutan | 'branchName';
+  key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo';
   direction: 'ascending' | 'descending';
 } | null;
 
@@ -61,7 +70,7 @@ export default function KasAngkutanPage() {
   const [editingKas, setEditingKas] = useState<KasAngkutan | null>(null);
   const [selectedKas, setSelectedKas] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'ascending' });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -82,7 +91,9 @@ export default function KasAngkutanPage() {
   }, [activeBranch, toast]);
   
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+    const isNegative = value < 0;
+    const formattedValue = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.abs(value));
+    return isNegative ? `(${formattedValue})` : formattedValue;
   };
   
   const sortedAndFilteredKasList = useMemo(() => {
@@ -90,13 +101,13 @@ export default function KasAngkutanPage() {
 
     if (searchQuery) {
         filterableKas = filterableKas.filter(kas =>
-          kas.doNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          kas.namaSopir.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (kas.doNumber && kas.doNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (kas.namaSopir && kas.namaSopir.toLowerCase().includes(searchQuery.toLowerCase())) ||
           kas.uraian.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }
     
-    // Sort by date first to ensure balance calculation is correct
+    // Always sort by date first for correct balance calculation
     filterableKas.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let runningBalance = 0;
@@ -111,13 +122,15 @@ export default function KasAngkutanPage() {
       withBalance.sort((a, b) => {
         let aValue: string | number;
         let bValue: string | number;
+        
+        const key = sortConfig.key as keyof typeof a;
 
-        if (sortConfig.key === 'branchName') {
+        if (key === 'branchName') {
             aValue = getBranchName(a.branchId);
             bValue = getBranchName(b.branchId);
         } else {
-            aValue = a[sortConfig.key as keyof KasAngkutan];
-            bValue = b[sortConfig.key as keyof KasAngkutan];
+            aValue = a[key];
+            bValue = b[key];
         }
         
         if (aValue < bValue) {
@@ -133,7 +146,7 @@ export default function KasAngkutanPage() {
     return withBalance;
   }, [kasList, searchQuery, sortConfig, getBranchName]);
 
-  const requestSort = (key: keyof KasAngkutan | 'branchName') => {
+  const requestSort = (key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -143,9 +156,8 @@ export default function KasAngkutanPage() {
   
   const summaryData = useMemo(() => {
     const totals = sortedAndFilteredKasList.reduce((acc, kas) => {
-        const totalPengeluaran = kas.adminFee + kas.uangMakan + kas.palang + kas.solar + kas.upahSopir + kas.lembur + kas.helper;
         acc.totalUangMasuk += kas.uangMasuk;
-        acc.totalPengeluaran += totalPengeluaran;
+        acc.totalPengeluaran += (kas as any).totalPengeluaran;
         return acc;
     }, { totalUangMasuk: 0, totalPengeluaran: 0 });
     return { ...totals, sisaSaldo: totals.totalUangMasuk - totals.totalPengeluaran };
@@ -160,22 +172,24 @@ export default function KasAngkutanPage() {
 
   const form = useForm<z.infer<typeof kasAngkutanSchema>>({
     resolver: zodResolver(kasAngkutanSchema),
+    defaultValues: { type: 'pemasukan' }
   });
+
+  const transactionType = useWatch({ control: form.control, name: 'type' });
 
   const handleDialogOpen = (kas: KasAngkutan | null) => {
     setEditingKas(kas);
     if (kas) {
-      // Find distribution id based on doNumber and namaSopir (this is not robust)
       const dist = distributions.find(d => d.doNumber === kas.doNumber && d.namaSopir === kas.namaSopir);
       form.reset({
+        ...kas,
         date: new Date(kas.date),
-        uangMasuk: kas.uangMasuk,
         distributionId: dist?.id || '',
-        uraian: kas.uraian
       });
     } else {
       form.reset({
         date: new Date(),
+        type: 'pemasukan',
         uangMasuk: 0,
         distributionId: '',
         uraian: '',
@@ -210,33 +224,46 @@ export default function KasAngkutanPage() {
       toast({ title: 'Error', description: 'Pilih cabang spesifik.', variant: 'destructive' });
       return;
     }
-    const distribution = distributions.find(d => d.id === values.distributionId);
-    if (!distribution) {
-      toast({ title: 'Error', description: 'Data distribusi tidak ditemukan.', variant: 'destructive' });
-      return;
+    
+    let kasData: KasAngkutanInput;
+
+    if (values.type === 'pemasukan') {
+        const distribution = distributions.find(d => d.id === values.distributionId);
+        if (!distribution) {
+          toast({ title: 'Error', description: 'Data distribusi tidak ditemukan.', variant: 'destructive' });
+          return;
+        }
+        const qty = distribution.quantity;
+        const jamAngkut = parse(distribution.jamAngkut, 'HH:mm', new Date());
+        const jamLembur = parse('14:00', 'HH:mm', new Date());
+        kasData = {
+            date: values.date.toISOString(),
+            type: 'pemasukan',
+            uangMasuk: values.uangMasuk,
+            doNumber: distribution.doNumber,
+            namaSopir: distribution.namaSopir,
+            uraian: values.uraian || '',
+            adminFee: 3125 * qty,
+            uangMakan: 40000,
+            palang: 5000 * qty,
+            solar: 12500 * qty,
+            upahSopir: 3500 * qty,
+            lembur: jamAngkut > jamLembur ? 2000 * qty : 0,
+            helper: 5000 * qty,
+            branchId: activeBranch.id,
+        };
+    } else { // Pengeluaran
+        kasData = {
+            date: values.date.toISOString(),
+            type: 'pengeluaran',
+            uangMasuk: 0,
+            uraian: values.uraian,
+            adminFee: 0, uangMakan: 0, palang: 0, solar: 0, upahSopir: 0, lembur: 0, helper: 0,
+            branchId: activeBranch.id,
+        };
     }
 
     try {
-      const qty = distribution.quantity;
-      const jamAngkut = parse(distribution.jamAngkut, 'HH:mm', new Date());
-      const jamLembur = parse('14:00', 'HH:mm', new Date());
-
-      const kasData: KasAngkutanInput = {
-        date: values.date.toISOString(),
-        uangMasuk: values.uangMasuk,
-        doNumber: distribution.doNumber,
-        namaSopir: distribution.namaSopir,
-        uraian: values.uraian || '',
-        adminFee: 3125 * qty,
-        uangMakan: 40000,
-        palang: 5000 * qty,
-        solar: 12500 * qty,
-        upahSopir: 3500 * qty,
-        lembur: jamAngkut > jamLembur ? 2000 * qty : 0,
-        helper: 5000 * qty,
-        branchId: activeBranch.id,
-      };
-
       if (editingKas) {
         await updateKasAngkutan(editingKas.id, kasData);
         setKasList(kasList.map((k) => (k.id === editingKas.id ? { id: k.id, ...kasData } : k)));
@@ -329,7 +356,7 @@ export default function KasAngkutanPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-          <Table className="text-xs">
+          <Table className="text-xs whitespace-nowrap">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                  <TableHead className="w-[40px] px-2">
@@ -339,15 +366,22 @@ export default function KasAngkutanPage() {
                     aria-label="Pilih semua"
                   />
                 </TableHead>
-                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('date')}>Tanggal <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('namaSopir')}>Nama Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('uraian')}>Uraian<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                {user?.role === 'owner' && <TableHead className="px-2"><Button className="text-xs px-2" variant="ghost" onClick={() => requestSort('branchName')}>Kabupaten <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
-                <TableHead className="text-right px-2">Uang Masuk</TableHead>
-                <TableHead className="text-right px-2">Total Pengeluaran</TableHead>
-                <TableHead className="text-right px-2">Sisa Uang</TableHead>
-                <TableHead className="text-right px-2">Saldo</TableHead>
+                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('date')}>Tgl <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('doNumber')}>NO DO <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('namaSopir')}>Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('uraian')}>Uraian<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                {user?.role === 'owner' && <TableHead><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('branchName')}>Kab. <ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>}
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('uangMasuk')}>Uang Masuk<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('adminFee')}>Admin<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('uangMakan')}>U. Makan<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('palang')}>Palang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('solar')}>Solar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('upahSopir')}>U. Sopir<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('lembur')}>Lembur<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('helper')}>Helper<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('totalPengeluaran')}>Total Keluar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('sisaUang')}>Sisa Uang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
+                <TableHead className="text-right"><Button className="text-xs px-1" variant="ghost" onClick={() => requestSort('saldo')}>Saldo<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
             </TableHeader>
@@ -361,12 +395,19 @@ export default function KasAngkutanPage() {
                       aria-label={`Pilih ${kas.id}`}
                     />
                   </TableCell>
-                  <TableCell className="px-2">{format(new Date(kas.date), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell className="font-medium px-2">{kas.doNumber}</TableCell>
-                  <TableCell className="font-medium px-2">{kas.namaSopir}</TableCell>
+                  <TableCell className="px-2">{format(new Date(kas.date), 'dd/MM/yy')}</TableCell>
+                  <TableCell className="font-medium px-2">{kas.doNumber || '-'}</TableCell>
+                  <TableCell className="font-medium px-2">{kas.namaSopir || '-'}</TableCell>
                   <TableCell className="font-medium px-2">{kas.uraian}</TableCell>
                   {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(kas.branchId)}</TableCell>}
-                  <TableCell className="text-right px-2 text-green-600 font-semibold">{formatCurrency(kas.uangMasuk)}</TableCell>
+                  <TableCell className="text-right px-2 text-green-600 font-semibold">{kas.type === 'pemasukan' ? formatCurrency(kas.uangMasuk) : '-'}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(kas.adminFee)}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(kas.uangMakan)}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(kas.palang)}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(kas.solar)}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(kas.upahSopir)}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(kas.lembur)}</TableCell>
+                  <TableCell className="text-right px-2">{formatCurrency(kas.helper)}</TableCell>
                   <TableCell className="text-right px-2 text-red-600 font-semibold">{formatCurrency((kas as any).totalPengeluaran)}</TableCell>
                   <TableCell className="text-right px-2 font-bold">{formatCurrency((kas as any).sisaUang)}</TableCell>
                   <TableCell className="text-right px-2 font-bold">{formatCurrency((kas as any).saldo)}</TableCell>
@@ -395,12 +436,39 @@ export default function KasAngkutanPage() {
             </DialogTitle>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 py-4">
+              <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                      <FormItem className="space-y-3">
+                          <FormLabel>Tipe Transaksi</FormLabel>
+                          <FormControl>
+                              <RadioGroup
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                  className="flex space-x-4"
+                                  disabled={!!editingKas}
+                              >
+                                  <FormItem className="flex items-center space-x-2">
+                                      <FormControl><RadioGroupItem value="pemasukan" id="pemasukan" /></FormControl>
+                                      <FormLabel htmlFor="pemasukan" className="font-normal cursor-pointer">Pemasukan</FormLabel>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-2">
+                                      <FormControl><RadioGroupItem value="pengeluaran" id="pengeluaran" /></FormControl>
+                                      <FormLabel htmlFor="pengeluaran" className="font-normal cursor-pointer">Pengeluaran</FormLabel>
+                                  </FormItem>
+                              </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
               <FormField
                 control={form.control}
                 name="date"
                 render={({ field }) => (
-                  <FormItem className="col-span-2">
+                  <FormItem>
                     <FormLabel>Tanggal</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -419,33 +487,38 @@ export default function KasAngkutanPage() {
                   </FormItem>
                 )}
               />
-               <FormField
-                control={form.control}
-                name="distributionId"
-                render={({ field }) => (
-                    <FormItem className="col-span-2">
-                        <FormLabel>Distribusi (NO DO - Sopir)</FormLabel>
-                        <Combobox
-                            options={distributionOptions}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Pilih Distribusi"
-                            searchPlaceholder="Cari NO DO atau Sopir..."
-                            emptyPlaceholder="Distribusi tidak ditemukan"
-                            disabled={!!editingKas}
-                        />
-                        <FormMessage />
-                    </FormItem>
-                )}
-                />
-              <FormField control={form.control} name="uangMasuk" render={({ field }) => (
-                  <FormItem className="col-span-2"><FormLabel>Uang Masuk</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-               <FormField control={form.control} name="uraian" render={({ field }) => (
-                  <FormItem className="col-span-2"><FormLabel>Uraian (Opsional)</FormLabel><FormControl><Input placeholder="cth. Biaya tambahan" {...field} /></FormControl><FormMessage /></FormItem>
+               {transactionType === 'pemasukan' && (
+                <>
+                    <FormField
+                        control={form.control}
+                        name="distributionId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Distribusi (NO DO - Sopir)</FormLabel>
+                                <Combobox
+                                    options={distributionOptions}
+                                    value={field.value || ""}
+                                    onChange={field.onChange}
+                                    placeholder="Pilih Distribusi"
+                                    searchPlaceholder="Cari NO DO atau Sopir..."
+                                    emptyPlaceholder="Distribusi tidak ditemukan"
+                                    disabled={!!editingKas}
+                                />
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField control={form.control} name="uangMasuk" render={({ field }) => (
+                      <FormItem><FormLabel>Uang Masuk</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                </>
+               )}
+
+              <FormField control={form.control} name="uraian" render={({ field }) => (
+                  <FormItem><FormLabel>Uraian</FormLabel><FormControl><Input placeholder={transactionType === 'pemasukan' ? "cth. Uang jalan" : "cth. Beli ban"} {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
 
-              <DialogFooter className="col-span-2">
+              <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Batal</Button></DialogClose>
                 <Button type="submit">{editingKas ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>

@@ -1,4 +1,5 @@
 
+
 export interface AppUser {
   uid: string;
   username: string;
@@ -85,9 +86,10 @@ export interface KasUmum {
 export interface KasAngkutan {
     id: string;
     date: string;
-    uangMasuk: number;
-    doNumber: string;
-    namaSopir: string;
+    type: 'pemasukan' | 'pengeluaran';
+    uangMasuk: number; // Tetap ada, 0 untuk pengeluaran
+    doNumber?: string;
+    namaSopir?: string;
     uraian: string;
     adminFee: number;
     uangMakan: number;
