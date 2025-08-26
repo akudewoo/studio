@@ -1,7 +1,7 @@
 
 'use client';
 
-import * as React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -209,27 +209,27 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
     }
 
     return (
-        <BranchProvider>
-            <SidebarProvider>
-                 <AppSidebar />
-                <SidebarInset>
-                    <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
-                        <SidebarTrigger />
-                        <h1 className="font-headline text-lg font-semibold">ALUR DISTRIBUSI</h1>
-                    </header>
-                    {children}
-                </SidebarInset>
-            </SidebarProvider>
-        </BranchProvider>
+        <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+                <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
+                    <SidebarTrigger />
+                    <h1 className="font-headline text-lg font-semibold">ALUR DISTRIBUSI</h1>
+                </header>
+                {children}
+            </SidebarInset>
+        </SidebarProvider>
     );
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
       <AuthProvider>
+        <BranchProvider>
           <ProtectedLayout>
               {children}
           </ProtectedLayout>
+        </BranchProvider>
       </AuthProvider>
   );
 }
