@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import type { AppUser } from '@/lib/types';
-import { hardcodedUsers } from '@/lib/data'; // We will create this file
+import { hardcodedUsers } from '@/lib/data';
 
 interface AuthContextType {
   user: AppUser | null;
@@ -22,16 +22,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const pathname = usePathname();
 
   useEffect(() => {
-    try {
-      const storedUser = sessionStorage.getItem('app-user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+    // This check ensures sessionStorage is only accessed on the client side
+    if (typeof window !== 'undefined') {
+      try {
+        const storedUser = sessionStorage.getItem('app-user');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        }
+      } catch (e) {
+        console.error('Could not parse user from sessionStorage', e);
+        sessionStorage.removeItem('app-user');
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      console.error('Could not parse user from sessionStorage', e);
-      sessionStorage.removeItem('app-user');
-    } finally {
-      setLoading(false);
+    } else {
+        setLoading(false);
     }
   }, []);
 
@@ -43,7 +48,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (foundUser) {
       const { password, ...userToStore } = foundUser; // Don't store password
       setUser(userToStore);
-      sessionStorage.setItem('app-user', JSON.stringify(userToStore));
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('app-user', JSON.stringify(userToStore));
+      }
       router.push('/dashboard');
     } else {
       throw new Error('Username atau password salah.');
@@ -52,19 +59,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
-    sessionStorage.removeItem('app-user');
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('app-user');
+    }
     router.push('/login');
   };
   
-   useEffect(() => {
-    if (!loading && !user && pathname !== '/login') {
-      router.push('/login');
-    }
-    if (!loading && user && pathname === '/login') {
-       router.push('/dashboard');
-    }
-  }, [user, loading, pathname, router]);
-
   const value = useMemo(() => ({
     user,
     loading,
@@ -74,11 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={value}>
-        {loading ? (
-             <div className="flex h-screen w-full items-center justify-center">
-                <p>Loading...</p>
-             </div>
-        ) : children}
+        {children}
     </AuthContext.Provider>
   );
 };

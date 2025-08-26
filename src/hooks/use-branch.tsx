@@ -36,18 +36,21 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         const branchData = await getBranches();
         setBranches(branchData);
-
-        if (user.role === 'owner') {
-           const storedBranchId = localStorage.getItem('activeBranchId');
-           if (storedBranchId === ALL_BRANCHES_ID) {
-              setActiveBranchState(allBranchesOption);
-           } else {
-             const branchToActivate = branchData.find(b => b.id === storedBranchId) || allBranchesOption;
-             setActiveBranchState(branchToActivate);
-           }
-        } else if (user.role === 'admin' && user.branchId) {
-            const assignedBranch = branchData.find(b => b.id === user.branchId);
-            setActiveBranchState(assignedBranch || null); // Admin must have an assigned branch
+        
+        // This check ensures localStorage is only accessed on the client side
+        if (typeof window !== 'undefined') {
+          if (user.role === 'owner') {
+            const storedBranchId = localStorage.getItem('activeBranchId');
+            if (storedBranchId === ALL_BRANCHES_ID) {
+                setActiveBranchState(allBranchesOption);
+            } else {
+              const branchToActivate = branchData.find(b => b.id === storedBranchId) || allBranchesOption;
+              setActiveBranchState(branchToActivate);
+            }
+          } else if (user.role === 'admin' && user.branchId) {
+              const assignedBranch = branchData.find(b => b.id === user.branchId) || branchData[0] || null;
+              setActiveBranchState(assignedBranch);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch branches:", error);
@@ -60,9 +63,9 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const setActiveBranch = (branch: Branch | { id: string, name: string } | null) => {
     setActiveBranchState(branch);
-    if (branch && user?.role === 'owner') {
+    if (branch && user?.role === 'owner' && typeof window !== 'undefined') {
       localStorage.setItem('activeBranchId', branch.id);
-    } else if (user?.role === 'owner') {
+    } else if (user?.role === 'owner' && typeof window !== 'undefined') {
       localStorage.removeItem('activeBranchId');
     }
   };
