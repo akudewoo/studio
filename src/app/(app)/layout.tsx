@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { BranchProvider, useBranch } from '@/hooks/use-branch';
-import { useAuth } from '@/hooks/use-auth';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -190,6 +190,13 @@ const AppSidebar = () => {
 
 const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!loading && !user) {
+            router.push('/login');
+        }
+    }, [user, loading, router]);
     
     if (loading || !user) {
         return (
