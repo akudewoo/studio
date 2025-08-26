@@ -44,21 +44,22 @@ const kasAngkutanSchema = z.object({
   date: z.date({ required_error: 'Tanggal harus diisi' }),
   type: z.enum(['pemasukan', 'pengeluaran'], { required_error: "Tipe transaksi harus dipilih"}),
   uangMasuk: z.coerce.number().min(0).default(0),
+  pengeluaran: z.coerce.number().min(0).default(0),
   distributionId: z.string().optional(),
   uraian: z.string().min(1, { message: 'Uraian harus diisi' }),
 }).superRefine((data, ctx) => {
-    if (data.type === 'pengeluaran' && !data.distributionId) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['distributionId'],
-            message: 'Distribusi (NO DO - Sopir) harus dipilih untuk Pengeluaran',
-        });
-    }
     if (data.type === 'pemasukan' && data.uangMasuk <= 0) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['uangMasuk'],
             message: 'Uang Masuk harus lebih dari 0 untuk Pemasukan',
+        });
+    }
+    if (data.type === 'pengeluaran' && !data.distributionId && data.pengeluaran <= 0) {
+       ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['pengeluaran'],
+            message: 'Nominal Pengeluaran harus diisi jika NO DO tidak dipilih',
         });
     }
 });
@@ -114,12 +115,12 @@ export default function KasAngkutanPage() {
         );
     }
     
-    // Always sort by date first for correct balance calculation
     filterableKas.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let runningBalance = 0;
     const withBalance = filterableKas.map(kas => {
-        const totalPengeluaran = kas.adminFee + kas.uangMakan + kas.palang + kas.solar + kas.upahSopir + kas.lembur + kas.helper;
+        const calculatedExpenses = kas.adminFee + kas.uangMakan + kas.palang + kas.solar + kas.upahSopir + kas.lembur + kas.helper;
+        const totalPengeluaran = kas.type === 'pengeluaran' ? (kas.doNumber ? calculatedExpenses : kas.pengeluaran) : 0;
         const sisaUang = kas.uangMasuk - totalPengeluaran;
         runningBalance += sisaUang;
         return { ...kas, totalPengeluaran, sisaUang, saldo: runningBalance };
@@ -171,22 +172,23 @@ export default function KasAngkutanPage() {
   }, [sortedAndFilteredKasList]);
 
   const distributionOptions = useMemo(() => {
-      // Prevent already used distributions from being selected again for 'pengeluaran'
-      const usedDoNumbers = kasList.filter(k => k.type === 'pengeluaran').map(k => k.doNumber);
+      const usedDoNumbers = kasList.filter(k => k.type === 'pengeluaran' && k.doNumber).map(k => k.doNumber);
       return distributions
-          .filter(d => !usedDoNumbers.includes(d.doNumber))
+          .filter(d => !usedDoNumbers.includes(d.doNumber) || (editingKas && d.doNumber === editingKas.doNumber))
           .map(d => ({
               value: d.id,
               label: `${d.doNumber} - ${d.namaSopir}`
           }));
-  }, [distributions, kasList]);
+  }, [distributions, kasList, editingKas]);
 
   const form = useForm<z.infer<typeof kasAngkutanSchema>>({
     resolver: zodResolver(kasAngkutanSchema),
-    defaultValues: { type: 'pengeluaran' }
+    defaultValues: { type: 'pengeluaran', uangMasuk: 0, pengeluaran: 0 }
   });
 
   const transactionType = useWatch({ control: form.control, name: 'type' });
+  const distributionId = useWatch({ control: form.control, name: 'distributionId' });
+
 
   const handleDialogOpen = (kas: KasAngkutan | null) => {
     setEditingKas(kas);
@@ -197,12 +199,14 @@ export default function KasAngkutanPage() {
         date: new Date(kas.date),
         type: kas.type,
         distributionId: dist?.id || '',
+        pengeluaran: kas.pengeluaran || 0,
       });
     } else {
       form.reset({
         date: new Date(),
         type: 'pengeluaran',
         uangMasuk: 0,
+        pengeluaran: 0,
         distributionId: '',
         uraian: '',
       });
@@ -240,37 +244,50 @@ export default function KasAngkutanPage() {
     let kasData: KasAngkutanInput;
 
     if (values.type === 'pengeluaran') {
-        const distribution = distributions.find(d => d.id === values.distributionId);
-        if (!distribution) {
-          toast({ title: 'Error', description: 'Data distribusi tidak ditemukan.', variant: 'destructive' });
-          return;
+        if (values.distributionId) {
+            const distribution = distributions.find(d => d.id === values.distributionId);
+            if (!distribution) {
+              toast({ title: 'Error', description: 'Data distribusi tidak ditemukan.', variant: 'destructive' });
+              return;
+            }
+            const qty = distribution.quantity;
+            const jamAngkut = parse(distribution.jamAngkut, 'HH:mm', new Date());
+            const jamLembur = parse('14:00', 'HH:mm', new Date());
+            kasData = {
+                date: values.date.toISOString(),
+                type: 'pengeluaran',
+                uangMasuk: 0,
+                pengeluaran: 0,
+                doNumber: distribution.doNumber,
+                namaSopir: distribution.namaSopir,
+                uraian: values.uraian || `Biaya DO: ${distribution.doNumber}`,
+                adminFee: 3125 * qty,
+                uangMakan: 40000,
+                palang: 5000 * qty,
+                solar: 12500 * qty,
+                upahSopir: 3500 * qty,
+                lembur: jamAngkut > jamLembur ? 2000 * qty : 0,
+                helper: 5000 * qty,
+                branchId: activeBranch.id,
+            };
+        } else {
+             kasData = {
+                date: values.date.toISOString(),
+                type: 'pengeluaran',
+                uangMasuk: 0,
+                pengeluaran: values.pengeluaran,
+                uraian: values.uraian,
+                adminFee: 0, uangMakan: 0, palang: 0, solar: 0, upahSopir: 0, lembur: 0, helper: 0,
+                branchId: activeBranch.id,
+            };
         }
-        const qty = distribution.quantity;
-        const jamAngkut = parse(distribution.jamAngkut, 'HH:mm', new Date());
-        const jamLembur = parse('14:00', 'HH:mm', new Date());
-        kasData = {
-            date: values.date.toISOString(),
-            type: 'pengeluaran',
-            uangMasuk: 0, // No income for expense type
-            doNumber: distribution.doNumber,
-            namaSopir: distribution.namaSopir,
-            uraian: values.uraian || `Biaya DO: ${distribution.doNumber}`,
-            adminFee: 3125 * qty,
-            uangMakan: 40000,
-            palang: 5000 * qty,
-            solar: 12500 * qty,
-            upahSopir: 3500 * qty,
-            lembur: jamAngkut > jamLembur ? 2000 * qty : 0,
-            helper: 5000 * qty,
-            branchId: activeBranch.id,
-        };
     } else { // Pemasukan
         kasData = {
             date: values.date.toISOString(),
             type: 'pemasukan',
             uangMasuk: values.uangMasuk,
+            pengeluaran: 0,
             uraian: values.uraian,
-            // All expense fields are zero for income type
             adminFee: 0, uangMakan: 0, palang: 0, solar: 0, upahSopir: 0, lembur: 0, helper: 0,
             branchId: activeBranch.id,
         };
@@ -279,7 +296,7 @@ export default function KasAngkutanPage() {
     try {
       if (editingKas) {
         await updateKasAngkutan(editingKas.id, kasData);
-        setKasList(kasList.map((k) => (k.id === editingKas.id ? { id: k.id, ...kasData } : k)));
+        setKasList(kasList.map((k) => (k.id === editingKas.id ? { ...editingKas, ...kasData } : k)));
         toast({ title: 'Sukses', description: 'Data kas berhasil diperbarui.' });
       } else {
         const newKas = await addKasAngkutan(kasData);
@@ -414,13 +431,13 @@ export default function KasAngkutanPage() {
                   <TableCell className="px-2 font-medium">{kas.uraian}</TableCell>
                   {user?.role === 'owner' && <TableCell className="px-2">{getBranchName(kas.branchId)}</TableCell>}
                   <TableCell className="px-2 text-right font-semibold text-green-600">{kas.type === 'pemasukan' ? formatCurrency(kas.uangMasuk) : '-'}</TableCell>
-                  <TableCell className="px-2 text-right">{formatCurrency(kas.adminFee)}</TableCell>
-                  <TableCell className="px-2 text-right">{formatCurrency(kas.uangMakan)}</TableCell>
-                  <TableCell className="px-2 text-right">{formatCurrency(kas.palang)}</TableCell>
-                  <TableCell className="px-2 text-right">{formatCurrency(kas.solar)}</TableCell>
-                  <TableCell className="px-2 text-right">{formatCurrency(kas.upahSopir)}</TableCell>
-                  <TableCell className="px-2 text-right">{formatCurrency(kas.lembur)}</TableCell>
-                  <TableCell className="px-2 text-right">{formatCurrency(kas.helper)}</TableCell>
+                  <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.adminFee) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.uangMakan) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.palang) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.solar) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.upahSopir) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.lembur) : '-'}</TableCell>
+                  <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.helper) : '-'}</TableCell>
                   <TableCell className="px-2 text-right font-semibold text-red-600">{formatCurrency((kas as any).totalPengeluaran)}</TableCell>
                   <TableCell className="px-2 text-right font-bold">{formatCurrency((kas as any).sisaUang)}</TableCell>
                   <TableCell className="px-2 text-right font-bold">{formatCurrency((kas as any).saldo)}</TableCell>
@@ -460,11 +477,12 @@ export default function KasAngkutanPage() {
                               <RadioGroup
                                   onValueChange={(value) => {
                                       field.onChange(value);
-                                      form.reset({ // Reset other fields when type changes
+                                      form.reset({
                                           ...form.getValues(),
                                           type: value as 'pemasukan' | 'pengeluaran',
                                           distributionId: '',
                                           uangMasuk: 0,
+                                          pengeluaran: 0,
                                           uraian: ''
                                       });
                                   }}
@@ -473,12 +491,12 @@ export default function KasAngkutanPage() {
                                   disabled={!!editingKas}
                               >
                                   <FormItem className="flex items-center space-x-2">
-                                      <FormControl><RadioGroupItem value="pengeluaran" id="pengeluaran" /></FormControl>
-                                      <FormLabel htmlFor="pengeluaran" className="cursor-pointer font-normal">Pengeluaran</FormLabel>
-                                  </FormItem>
-                                  <FormItem className="flex items-center space-x-2">
                                       <FormControl><RadioGroupItem value="pemasukan" id="pemasukan" /></FormControl>
                                       <FormLabel htmlFor="pemasukan" className="cursor-pointer font-normal">Pemasukan</FormLabel>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-2">
+                                      <FormControl><RadioGroupItem value="pengeluaran" id="pengeluaran" /></FormControl>
+                                      <FormLabel htmlFor="pengeluaran" className="cursor-pointer font-normal">Pengeluaran</FormLabel>
                                   </FormItem>
                               </RadioGroup>
                           </FormControl>
@@ -510,25 +528,33 @@ export default function KasAngkutanPage() {
                 )}
               />
                {transactionType === 'pengeluaran' && (
-                  <FormField
-                      control={form.control}
-                      name="distributionId"
-                      render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Distribusi (NO DO - Sopir)</FormLabel>
-                              <Combobox
-                                  options={distributionOptions}
-                                  value={field.value || ""}
-                                  onChange={field.onChange}
-                                  placeholder="Pilih Distribusi"
-                                  searchPlaceholder="Cari NO DO atau Sopir..."
-                                  emptyPlaceholder="Distribusi tidak ditemukan"
-                                  disabled={!!editingKas}
-                              />
-                              <FormMessage />
-                          </FormItem>
-                      )}
-                  />
+                  <>
+                    <FormField
+                        control={form.control}
+                        name="distributionId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Distribusi (NO DO - Sopir) - Opsional</FormLabel>
+                                <Combobox
+                                    options={distributionOptions}
+                                    value={field.value || ""}
+                                    onChange={(value) => {
+                                        field.onChange(value);
+                                        form.setValue('pengeluaran', 0); // Reset manual expense if DO is selected
+                                    }}
+                                    placeholder="Pilih Distribusi (jika ada)"
+                                    searchPlaceholder="Cari NO DO atau Sopir..."
+                                    emptyPlaceholder="Distribusi tidak ditemukan"
+                                    disabled={!!editingKas}
+                                />
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField control={form.control} name="pengeluaran" render={({ field }) => (
+                      <FormItem><FormLabel>Nominal Pengeluaran</FormLabel><FormControl><Input type="number" placeholder="0" {...field} disabled={!!distributionId} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                  </>
                )}
 
                {transactionType === 'pemasukan' && (
@@ -538,7 +564,7 @@ export default function KasAngkutanPage() {
                )}
 
               <FormField control={form.control} name="uraian" render={({ field }) => (
-                  <FormItem><FormLabel>Uraian</FormLabel><FormControl><Input placeholder={transactionType === 'pemasukan' ? "cth. Pemasukan dari kasir" : "cth. Biaya tak terduga"} {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Uraian</FormLabel><FormControl><Input placeholder="cth. Pemasukan dari kasir atau Biaya tak terduga" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
 
               <DialogFooter>

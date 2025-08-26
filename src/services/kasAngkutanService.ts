@@ -18,7 +18,7 @@ export async function getKasAngkutan(branchId: string): Promise<KasAngkutan[]> {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KasAngkutan));
 }
 
-export async function updateKasAngkutan(id: string, kas: Partial<KasAngkutan>): Promise<void> {
+export async function updateKasAngkutan(id: string, kas: Partial<KasAngkutanInput>): Promise<void> {
     const kasDoc = doc(db, 'kasAngkutan', id);
     await updateDoc(kasDoc, kas);
 }

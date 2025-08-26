@@ -88,6 +88,7 @@ export interface KasAngkutan {
     date: string;
     type: 'pemasukan' | 'pengeluaran';
     uangMasuk: number;
+    pengeluaran: number;
     doNumber?: string;
     namaSopir?: string;
     uraian: string;
