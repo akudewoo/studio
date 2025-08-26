@@ -65,7 +65,7 @@ const kasAngkutanSchema = z.object({
 });
 
 type SortConfig = {
-  key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo' | 'nominal';
+  key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'saldo' | 'nominal';
   direction: 'ascending' | 'descending';
 } | null;
 
@@ -124,7 +124,7 @@ export default function KasAngkutanPage() {
         const totalPengeluaran = kas.type === 'pengeluaran' ? (kas.doNumber ? calculatedExpenses : kas.pengeluaran) : 0;
         const sisaUang = kas.uangMasuk - totalPengeluaran;
         runningBalance += sisaUang;
-        return { ...kas, nominal, totalPengeluaran, sisaUang, saldo: runningBalance };
+        return { ...kas, nominal, totalPengeluaran, saldo: runningBalance };
     });
 
     if (sortConfig !== null) {
@@ -155,7 +155,7 @@ export default function KasAngkutanPage() {
     return withBalance;
   }, [kasList, searchQuery, sortConfig, getBranchName]);
 
-  const requestSort = (key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'sisaUang' | 'saldo' | 'nominal') => {
+  const requestSort = (key: keyof KasAngkutan | 'branchName' | 'totalPengeluaran' | 'saldo' | 'nominal') => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -411,7 +411,6 @@ export default function KasAngkutanPage() {
                 <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('lembur')}>Lembur<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('helper')}>Helper<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('totalPengeluaran')}>Total Keluar<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
-                <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('sisaUang')}>Sisa Uang<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="text-right"><Button className="px-1 text-xs" variant="ghost" onClick={() => requestSort('saldo')}>Saldo<ArrowUpDown className="ml-2 h-3 w-3" /></Button></TableHead>
                 <TableHead className="w-[40px] px-2"></TableHead>
               </TableRow>
@@ -440,7 +439,6 @@ export default function KasAngkutanPage() {
                   <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.lembur) : '-'}</TableCell>
                   <TableCell className="px-2 text-right">{kas.doNumber ? formatCurrency(kas.helper) : '-'}</TableCell>
                   <TableCell className="px-2 text-right font-semibold text-red-600">{formatCurrency((kas as any).totalPengeluaran)}</TableCell>
-                  <TableCell className="px-2 text-right font-bold">{formatCurrency((kas as any).sisaUang)}</TableCell>
                   <TableCell className="px-2 text-right font-bold">{formatCurrency((kas as any).saldo)}</TableCell>
                   <TableCell className="px-2">
                     <DropdownMenu>
