@@ -75,7 +75,7 @@ export default function PenyaluranKiosPage() {
   const [selectedDists, setSelectedDists] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState<{key: 'kioskId' | 'doNumber' | 'none', value: string}>({key: 'none', value: 'all'});
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'descending' });
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,8 +128,8 @@ export default function PenyaluranKiosPage() {
     
     if (sortConfig !== null) {
       filterableDistributions.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
         
         const { product: productA } = getDetails(a.doNumber);
         const { product: productB } = getDetails(b.doNumber);
@@ -165,6 +165,10 @@ export default function PenyaluranKiosPage() {
                  aValue = getBranchName(a.branchId);
                  bValue = getBranchName(b.branchId);
                  break;
+            case 'date':
+                aValue = new Date(a.date);
+                bValue = new Date(b.date);
+                break;
             default:
                 aValue = a[sortConfig.key as keyof KioskDistribution];
                 bValue = b[sortConfig.key as keyof KioskDistribution];

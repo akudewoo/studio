@@ -106,7 +106,7 @@ export default function PembayaranPage() {
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState<{key: 'kioskId' | 'none', value: string}>({key: 'none', value: 'all'});
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'descending' });
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -150,8 +150,8 @@ export default function PembayaranPage() {
     
     if (sortConfig !== null) {
       filterablePayments.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
 
         if (sortConfig.key === 'kioskName') {
           aValue = getKioskName(a.kioskId);
@@ -159,6 +159,9 @@ export default function PembayaranPage() {
         } else if (sortConfig.key === 'branchName') {
             aValue = getBranchName(a.branchId);
             bValue = getBranchName(b.branchId);
+        } else if (sortConfig.key === 'date') {
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
         } else {
           aValue = a[sortConfig.key as keyof Payment];
           bValue = b[sortConfig.key as keyof Payment];
@@ -698,5 +701,3 @@ export default function PembayaranPage() {
     </div>
   );
 }
-
-    

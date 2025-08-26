@@ -63,7 +63,7 @@ export default function KasUmumPage() {
   const [editingKas, setEditingKas] = useState<KasUmum | null>(null);
   const [selectedKas, setSelectedKas] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'descending' });
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,12 +116,15 @@ export default function KasUmumPage() {
 
     if (sortConfig !== null) {
       withBalance.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
 
         if (sortConfig.key === 'branchName') {
             aValue = getBranchName(a.branchId);
             bValue = getBranchName(b.branchId);
+        } else if (sortConfig.key === 'date') {
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
         } else {
             aValue = a[sortConfig.key as keyof KasUmum];
             bValue = b[sortConfig.key as keyof KasUmum];
@@ -574,5 +577,3 @@ export default function KasUmumPage() {
     </main>
   );
 }
-
-    

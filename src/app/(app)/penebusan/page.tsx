@@ -65,7 +65,7 @@ export default function PenebusanPage() {
   const [selectedRedemptions, setSelectedRedemptions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState<{key: keyof Redemption | 'none', value: string}>({key: 'none', value: 'all'});
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'descending' });
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -114,8 +114,8 @@ export default function PenebusanPage() {
 
     if (sortConfig !== null) {
       filterableRedemptions.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
 
         if (sortConfig.key === 'productName') {
             aValue = productMap[a.productId]?.name || '';
@@ -128,6 +128,9 @@ export default function PenebusanPage() {
         } else if (sortConfig.key === 'branchName') {
             aValue = getBranchName(a.branchId);
             bValue = getBranchName(b.branchId);
+        } else if (sortConfig.key === 'date') {
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
         } else {
             aValue = a[sortConfig.key as keyof Redemption];
             bValue = b[sortConfig.key as keyof Redemption];
@@ -685,5 +688,3 @@ export default function PenebusanPage() {
     </div>
   );
 }
-
-    

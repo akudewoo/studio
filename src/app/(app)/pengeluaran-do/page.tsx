@@ -69,7 +69,7 @@ export default function PengeluaranDOPage() {
   const [editingRelease, setEditingRelease] = useState<DORelease | null>(null);
   const [selectedReleases, setSelectedReleases] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'descending' });
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,8 +128,8 @@ export default function PengeluaranDOPage() {
     
     if (sortConfig !== null) {
       filterableReleases.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
         
         const redemptionA = redemptionMap[a.doNumber];
         const redemptionB = redemptionMap[b.doNumber];
@@ -145,6 +145,9 @@ export default function PengeluaranDOPage() {
         } else if (sortConfig.key === 'branchName') {
             aValue = redemptionA ? getBranchName(redemptionA.branchId) : '';
             bValue = redemptionB ? getBranchName(redemptionB.branchId) : '';
+        } else if (sortConfig.key === 'date') {
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
         } else {
             aValue = a[sortConfig.key as keyof DORelease];
             bValue = b[sortConfig.key as keyof DORelease];
@@ -637,5 +640,3 @@ export default function PengeluaranDOPage() {
     </div>
   );
 }
-
-    

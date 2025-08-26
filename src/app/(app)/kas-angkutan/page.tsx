@@ -78,7 +78,7 @@ export default function KasAngkutanPage() {
   const [editingKas, setEditingKas] = useState<KasAngkutan | null>(null);
   const [selectedKas, setSelectedKas] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'ascending' });
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'date', direction: 'descending' });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -115,6 +115,7 @@ export default function KasAngkutanPage() {
         );
     }
     
+    // First, sort by date to calculate running balance correctly
     filterableKas.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let runningBalance = 0;
@@ -122,24 +123,26 @@ export default function KasAngkutanPage() {
         const nominal = kas.uangMasuk;
         const calculatedExpenses = kas.adminFee + kas.uangMakan + kas.palang + kas.solar + kas.upahSopir + kas.lembur + kas.helper;
         const totalPengeluaran = kas.type === 'pengeluaran' ? (kas.doNumber ? calculatedExpenses : kas.pengeluaran) : 0;
-        const sisaUang = kas.uangMasuk - totalPengeluaran;
-        runningBalance += sisaUang;
+        runningBalance += (kas.uangMasuk - totalPengeluaran);
         return { ...kas, nominal, totalPengeluaran, saldo: runningBalance };
     });
 
     if (sortConfig !== null) {
       withBalance.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
         
         const key = sortConfig.key as keyof typeof a;
 
         if (key === 'branchName') {
             aValue = getBranchName(a.branchId);
             bValue = getBranchName(b.branchId);
+        } else if (key === 'date') {
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
         } else {
-            aValue = a[key];
-            bValue = b[key];
+            aValue = a[key] as string | number;
+            bValue = b[key] as string | number;
         }
         
         if (aValue < bValue) {
@@ -169,7 +172,8 @@ export default function KasAngkutanPage() {
         acc.totalPengeluaran += (kas as any).totalPengeluaran;
         return acc;
     }, { totalUangMasuk: 0, totalPengeluaran: 0 });
-    return { ...totals, sisaSaldo: totals.totalUangMasuk - totals.totalPengeluaran };
+    const lastKas = sortedAndFilteredKasList.length > 0 ? sortedAndFilteredKasList[sortedAndFilteredKasList.length - 1] : null;
+    return { ...totals, sisaSaldo: lastKas ? (lastKas as any).saldo : 0 };
   }, [sortedAndFilteredKasList]);
 
   const distributionOptions = useMemo(() => {
