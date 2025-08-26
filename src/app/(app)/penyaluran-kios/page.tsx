@@ -251,6 +251,13 @@ export default function PenyaluranKiosPage() {
     }));
   }, [doReleases, products, redemptions]);
 
+  const kioskOptions = useMemo(() => {
+    return kiosks.map(k => ({
+      value: k.id,
+      label: k.name,
+    }));
+  }, [kiosks]);
+
   const handleDialogOpen = (dist: KioskDistribution | null) => {
     setEditingDist(dist);
     if (dist) form.reset({ ...dist, date: new Date(dist.date) });
@@ -710,12 +717,24 @@ export default function PenyaluranKiosPage() {
                   </FormItem>
                 )}
               />
-              <FormField name="kioskId" control={form.control} render={({ field }) => (
-                <FormItem className="col-span-2"><FormLabel>Nama Kios</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Pilih Kios" /></SelectTrigger></FormControl>
-                  <SelectContent>{kiosks.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}</SelectContent>
-                </Select><FormMessage /></FormItem>
-              )} />
+              <FormField
+                control={form.control}
+                name="kioskId"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Nama Kios</FormLabel>
+                    <Combobox
+                      options={kioskOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Pilih Kios"
+                      searchPlaceholder="Cari Kios..."
+                      emptyPlaceholder="Kios tidak ditemukan."
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField name="namaSopir" control={form.control} render={({ field }) => (
                 <FormItem><FormLabel>Nama Sopir</FormLabel><FormControl><Input placeholder="cth. Budi" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
