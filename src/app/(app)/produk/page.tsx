@@ -31,11 +31,13 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, Redemption, DORelease, ProductInput } from '@/lib/types';
-import { addProduct, updateProduct, deleteProduct, deleteMultipleProducts, addMultipleProducts } from '@/services/productService';
+import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultipleProducts, addMultipleProducts } from '@/services/productService';
+import { getRedemptions } from '@/services/redemptionService';
+import { getDOReleases } from '@/services/doReleaseService';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
 import { useAuth } from '@/hooks/use-auth';
-import { useData } from '@/hooks/use-data';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const productSchema = z.object({
@@ -51,9 +53,12 @@ type SortConfig = {
 
 export default function ProdukPage() {
   const { user } = useAuth();
-  const { activeBranch, getBranchName } = useBranch();
-  const { data, loading, refetchData } = useData();
-  const { products, redemptions, doReleases } = data;
+  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
+  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [doReleases, setDoReleases] = useState<DORelease[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -63,6 +68,35 @@ export default function ProdukPage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const refetchData = async () => {
+    if (!activeBranch) return;
+    setLoading(true);
+    try {
+      const [productsData, redemptionsData, doReleasesData] = await Promise.all([
+        getProducts(activeBranch.id),
+        getRedemptions(activeBranch.id),
+        getDOReleases(activeBranch.id),
+      ]);
+      setProducts(productsData);
+      setRedemptions(redemptionsData);
+      setDoReleases(doReleasesData);
+    } catch (error) {
+       toast({
+        title: 'Gagal memuat data',
+        description: 'Terjadi kesalahan saat memuat data produk.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeBranch) {
+      refetchData();
+    }
+  }, [activeBranch]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
   };
@@ -369,8 +403,24 @@ export default function ProdukPage() {
   };
 
 
-  if (loading) {
-    return <div>Loading...</div>
+  if (loading || branchLoading) {
+    return (
+        <div className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
+            <div className="flex items-center gap-4">
+                <h1 className="font-headline text-lg font-semibold md:text-2xl">Daftar Produk</h1>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
+            </div>
+            <Card>
+                <CardContent className="p-0">
+                    <Skeleton className="h-96" />
+                </CardContent>
+            </Card>
+        </div>
+    )
   }
 
   return (

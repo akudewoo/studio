@@ -39,7 +39,6 @@ import { BranchProvider, useBranch } from '@/hooks/use-branch';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DataProvider } from '@/hooks/use-data';
 
 const navItems = [
   { href: '/dashboard', label: 'Dasbor', icon: LayoutDashboard },
@@ -229,11 +228,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
       <AuthProvider>
         <BranchProvider>
-          <DataProvider>
             <ProtectedLayout>
                 {children}
             </ProtectedLayout>
-          </DataProvider>
         </BranchProvider>
       </AuthProvider>
   );

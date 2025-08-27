@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
 import { useBranch } from './use-branch';
 import { useToast } from './use-toast';
 
@@ -14,7 +14,7 @@ import { getPayments } from '@/services/paymentService';
 import { getKasUmum } from '@/services/kasUmumService';
 import { getKasAngkutan } from '@/services/kasAngkutanService';
 
-import type { Kiosk, Product, Redemption, DORelease, KioskDistribution, Payment, KasUmum, KasAngkutan, Branch } from '@/lib/types';
+import type { Kiosk, Product, Redemption, DORelease, KioskDistribution, Payment, KasUmum, KasAngkutan } from '@/lib/types';
 
 interface DataState {
   kiosks: Kiosk[];
@@ -53,7 +53,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const refetchData = async () => {
+  const refetchData = useCallback(async () => {
     if (!activeBranch) return;
 
     setLoading(true);
@@ -85,20 +85,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeBranch, branches, toast]);
 
   useEffect(() => {
     if (activeBranch) {
         refetchData();
     }
-  }, [activeBranch]);
+  }, [activeBranch, refetchData]);
 
   const contextValue = useMemo(() => ({
     data,
     loading,
     refetchData,
     setData,
-  }), [data, loading]);
+  }), [data, loading, refetchData]);
 
   return (
     <DataContext.Provider value={contextValue}>

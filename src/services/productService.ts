@@ -5,10 +5,9 @@ import type { Product, ProductInput } from '@/lib/types';
 const TABLE_NAME = 'products';
 
 export async function addProduct(product: ProductInput): Promise<Product> {
-    const newProduct = { ...product, id: crypto.randomUUID() };
     const { data, error } = await supabase
         .from(TABLE_NAME)
-        .insert(newProduct)
+        .insert(product)
         .select()
         .single();
     if (error) throw error;
@@ -16,10 +15,9 @@ export async function addProduct(product: ProductInput): Promise<Product> {
 }
 
 export async function addMultipleProducts(products: ProductInput[]): Promise<Product[]> {
-    const newProductsWithIds = products.map(p => ({...p, id: crypto.randomUUID()}));
     const { data, error } = await supabase
         .from(TABLE_NAME)
-        .insert(newProductsWithIds)
+        .insert(products)
         .select();
     if (error) throw error;
     return data;

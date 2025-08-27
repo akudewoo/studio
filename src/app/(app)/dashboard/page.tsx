@@ -10,13 +10,58 @@ import { Package, Store, CircleDollarSign, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { useData } from '@/hooks/use-data';
 import { useBranch } from '@/hooks/use-branch';
 import type { Kiosk, Product, Redemption, DORelease, KioskDistribution, Payment } from '@/lib/types';
+import { getKiosks } from '@/services/kioskService';
+import { getProducts } from '@/services/productService';
+import { getRedemptions } from '@/services/redemptionService';
+import { getDOReleases } from '@/services/doReleaseService';
+import { getKioskDistributions } from '@/services/kioskDistributionService';
+import { getPayments } from '@/services/paymentService';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
   const { activeBranch } = useBranch();
-  const { data, loading } = useData();
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const [data, setData] = useState<{
+    kiosks: Kiosk[],
+    products: Product[],
+    redemptions: Redemption[],
+    doReleases: DORelease[],
+    distributions: KioskDistribution[],
+    payments: Payment[],
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!activeBranch) return;
+
+      setLoading(true);
+      try {
+        const [kiosks, products, redemptions, doReleases, distributions, payments] = await Promise.all([
+          getKiosks(activeBranch.id),
+          getProducts(activeBranch.id),
+          getRedemptions(activeBranch.id),
+          getDOReleases(activeBranch.id),
+          getKioskDistributions(activeBranch.id),
+          getPayments(activeBranch.id),
+        ]);
+        setData({ kiosks, products, redemptions, doReleases, distributions, payments });
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+        toast({
+          title: 'Gagal memuat data',
+          description: 'Terjadi kesalahan saat memuat data dari database.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [activeBranch, toast]);
+
 
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
@@ -140,7 +185,7 @@ export default function DashboardPage() {
     return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks, monthlySales, topSellingProducts };
   }, [data, loading]);
   
-  if (loading) {
+  if (loading || !data) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
           <h1 className="font-headline text-lg font-semibold md:text-2xl">Dasbor</h1>
@@ -151,6 +196,10 @@ export default function DashboardPage() {
               <Skeleton className="h-80" />
               <Skeleton className="h-80" />
               <Skeleton className="h-80 lg:col-span-1" />
+          </div>
+           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-80 lg:col-span-2" />
+              <Skeleton className="h-80" />
           </div>
       </main>
     );
