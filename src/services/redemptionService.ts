@@ -1,49 +1,57 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import type { Redemption, RedemptionInput } from '@/lib/types';
 
-const redemptionsCollection = collection(db, 'redemptions');
+const TABLE_NAME = 'redemptions';
 
 export async function addRedemption(redemption: RedemptionInput): Promise<Redemption> {
-    const docRef = await addDoc(redemptionsCollection, redemption);
-    return { id: docRef.id, ...redemption };
+    const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(redemption)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
 }
 
 export async function addMultipleRedemptions(redemptions: RedemptionInput[]): Promise<Redemption[]> {
-    const batch = writeBatch(db);
-    const newRedemptions: Redemption[] = [];
-    redemptions.forEach(redemption => {
-        const docRef = doc(redemptionsCollection);
-        batch.set(docRef, redemption);
-        newRedemptions.push({ id: docRef.id, ...redemption });
-    });
-    await batch.commit();
-    return newRedemptions;
+    const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(redemptions)
+        .select();
+    if (error) throw error;
+    return data;
 }
 
 export async function getRedemptions(branchId: string): Promise<Redemption[]> {
-    const q = branchId === 'all'
-        ? redemptionsCollection
-        : query(redemptionsCollection, where("branchId", "==", branchId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Redemption));
+    let query = supabase.from(TABLE_NAME).select('*');
+    if (branchId !== 'all') {
+        query = query.eq('branchId', branchId);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
 }
 
 export async function updateRedemption(id: string, redemption: Partial<Redemption>): Promise<void> {
-    const redemptionDoc = doc(db, 'redemptions', id);
-    await updateDoc(redemptionDoc, redemption);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .update(redemption)
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteRedemption(id: string): Promise<void> {
-    const redemptionDoc = doc(db, 'redemptions', id);
-    await deleteDoc(redemptionDoc);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteMultipleRedemptions(ids: string[]): Promise<void> {
-    const batch = writeBatch(db);
-    ids.forEach(id => {
-        const redemptionDoc = doc(db, 'redemptions', id);
-        batch.delete(redemptionDoc);
-    });
-    await batch.commit();
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .in('id', ids);
+    if (error) throw error;
 }

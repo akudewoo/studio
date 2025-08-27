@@ -1,49 +1,57 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import type { KioskDistribution, KioskDistributionInput } from '@/lib/types';
 
-const kioskDistributionsCollection = collection(db, 'kioskDistributions');
+const TABLE_NAME = 'kioskDistributions';
 
 export async function addKioskDistribution(distribution: KioskDistributionInput): Promise<KioskDistribution> {
-    const docRef = await addDoc(kioskDistributionsCollection, distribution);
-    return { id: docRef.id, ...distribution };
+    const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(distribution)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
 }
 
 export async function addMultipleKioskDistributions(distributions: KioskDistributionInput[]): Promise<KioskDistribution[]> {
-    const batch = writeBatch(db);
-    const newDistributions: KioskDistribution[] = [];
-    distributions.forEach(distribution => {
-        const docRef = doc(kioskDistributionsCollection);
-        batch.set(docRef, distribution);
-        newDistributions.push({ id: docRef.id, ...distribution });
-    });
-    await batch.commit();
-    return newDistributions;
+    const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(distributions)
+        .select();
+    if (error) throw error;
+    return data;
 }
 
 export async function getKioskDistributions(branchId: string): Promise<KioskDistribution[]> {
-    const q = branchId === 'all'
-        ? kioskDistributionsCollection
-        : query(kioskDistributionsCollection, where("branchId", "==", branchId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KioskDistribution));
+    let query = supabase.from(TABLE_NAME).select('*');
+    if (branchId !== 'all') {
+        query = query.eq('branchId', branchId);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
 }
 
 export async function updateKioskDistribution(id: string, distribution: Partial<KioskDistribution>): Promise<void> {
-    const distributionDoc = doc(db, 'kioskDistributions', id);
-    await updateDoc(distributionDoc, distribution);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .update(distribution)
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteKioskDistribution(id: string): Promise<void> {
-    const distributionDoc = doc(db, 'kioskDistributions', id);
-    await deleteDoc(distributionDoc);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteMultipleKioskDistributions(ids: string[]): Promise<void> {
-    const batch = writeBatch(db);
-    ids.forEach(id => {
-        const distributionDoc = doc(db, 'kioskDistributions', id);
-        batch.delete(distributionDoc);
-    });
-    await batch.commit();
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .in('id', ids);
+    if (error) throw error;
 }

@@ -1,49 +1,57 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import type { Product, ProductInput } from '@/lib/types';
 
-const productsCollection = collection(db, 'products');
+const TABLE_NAME = 'products';
 
 export async function addProduct(product: ProductInput): Promise<Product> {
-    const docRef = await addDoc(productsCollection, product);
-    return { id: docRef.id, ...product };
+    const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(product)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
 }
 
 export async function addMultipleProducts(products: ProductInput[]): Promise<Product[]> {
-    const batch = writeBatch(db);
-    const newProducts: Product[] = [];
-    products.forEach(product => {
-        const docRef = doc(productsCollection);
-        batch.set(docRef, product);
-        newProducts.push({ id: docRef.id, ...product });
-    });
-    await batch.commit();
-    return newProducts;
+    const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(products)
+        .select();
+    if (error) throw error;
+    return data;
 }
 
 export async function getProducts(branchId: string): Promise<Product[]> {
-    const q = branchId === 'all'
-        ? productsCollection
-        : query(productsCollection, where("branchId", "==", branchId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+    let query = supabase.from(TABLE_NAME).select('*');
+    if (branchId !== 'all') {
+        query = query.eq('branchId', branchId);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
 }
 
 export async function updateProduct(id: string, product: Partial<Product>): Promise<void> {
-    const productDoc = doc(db, 'products', id);
-    await updateDoc(productDoc, product);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .update(product)
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-    const productDoc = doc(db, 'products', id);
-    await deleteDoc(productDoc);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteMultipleProducts(ids: string[]): Promise<void> {
-    const batch = writeBatch(db);
-    ids.forEach(id => {
-        const productDoc = doc(db, 'products', id);
-        batch.delete(productDoc);
-    });
-    await batch.commit();
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .in('id', ids);
+    if (error) throw error;
 }

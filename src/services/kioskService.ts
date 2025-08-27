@@ -1,49 +1,57 @@
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import type { Kiosk, KioskInput } from '@/lib/types';
 
-const kiosksCollection = collection(db, 'kiosks');
+const TABLE_NAME = 'kiosks';
 
 export async function addKiosk(kiosk: KioskInput): Promise<Kiosk> {
-    const docRef = await addDoc(kiosksCollection, kiosk);
-    return { id: docRef.id, ...kiosk };
+    const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(kiosk)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
 }
 
 export async function addMultipleKiosks(kiosks: KioskInput[]): Promise<Kiosk[]> {
-    const batch = writeBatch(db);
-    const newKiosks: Kiosk[] = [];
-    kiosks.forEach(kiosk => {
-        const docRef = doc(kiosksCollection);
-        batch.set(docRef, kiosk);
-        newKiosks.push({ id: docRef.id, ...kiosk });
-    });
-    await batch.commit();
-    return newKiosks;
+     const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .insert(kiosks)
+        .select();
+    if (error) throw error;
+    return data;
 }
 
 export async function getKiosks(branchId: string): Promise<Kiosk[]> {
-    const q = branchId === 'all' 
-        ? kiosksCollection 
-        : query(kiosksCollection, where("branchId", "==", branchId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kiosk));
+    let query = supabase.from(TABLE_NAME).select('*');
+    if (branchId !== 'all') {
+        query = query.eq('branchId', branchId);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
 }
 
 export async function updateKiosk(id: string, kiosk: Partial<Kiosk>): Promise<void> {
-    const kioskDoc = doc(db, 'kiosks', id);
-    await updateDoc(kioskDoc, kiosk);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .update(kiosk)
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteKiosk(id: string): Promise<void> {
-    const kioskDoc = doc(db, 'kiosks', id);
-    await deleteDoc(kioskDoc);
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .eq('id', id);
+    if (error) throw error;
 }
 
 export async function deleteMultipleKiosks(ids: string[]): Promise<void> {
-    const batch = writeBatch(db);
-    ids.forEach(id => {
-        const kioskDoc = doc(db, 'kiosks', id);
-        batch.delete(kioskDoc);
-    });
-    await batch.commit();
+    const { error } = await supabase
+        .from(TABLE_NAME)
+        .delete()
+        .in('id', ids);
+    if (error) throw error;
 }
