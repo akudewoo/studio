@@ -33,7 +33,6 @@ import {
   LogOut,
   Book,
   Car,
-  Scale,
 } from 'lucide-react';
 import { Logo } from '@/components/icons/logo';
 import { BranchProvider, useBranch } from '@/hooks/use-branch';
@@ -53,7 +52,6 @@ const navItems = [
   { href: '/kas-angkutan', label: 'Kas Angkutan', icon: Car },
   { href: '/ringkasan-harian', label: 'Ringkasan Harian', icon: Newspaper },
   { href: '/laporan', label: 'Laporan', icon: FileText },
-  { href: '/perbandingan-paket', label: 'Perbandingan Paket', icon: Scale },
 ];
 
 const BranchSelector = () => {
