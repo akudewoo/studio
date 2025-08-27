@@ -1,144 +1,169 @@
--- 1. Tabel Cabang (Branches)
-CREATE TABLE branches (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    name text NOT NULL
+-- supabase_schema.sql
+
+-- 1. Cabang (Branches)
+-- Menyimpan daftar cabang perusahaan.
+drop table if exists "branches" cascade;
+create table "branches" (
+    "id" uuid primary key default gen_random_uuid(),
+    "name" text not null unique
 );
+-- RLS for branches
+alter table "branches" enable row level security;
+create policy "Allow authenticated users to manage branches" on "branches" for all using (auth.role() = 'authenticated');
+-- Seed data for branches
+insert into "branches" (name) values ('MAGETAN'), ('SRAGEN');
 
--- Masukkan data cabang awal
-INSERT INTO branches (name) VALUES ('MAGETAN'), ('SRAGEN');
 
-
--- 2. Tabel Produk (Products)
-CREATE TABLE products (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    name text NOT NULL,
-    purchasePrice numeric NOT NULL,
-    sellPrice numeric NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+-- 2. Produk (Products)
+-- Menyimpan daftar produk yang dijual.
+drop table if exists "products" cascade;
+create table "products" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "name" text not null,
+    "purchasePrice" double precision not null default 0,
+    "sellPrice" double precision not null default 0,
+    "branchId" uuid not null references "branches"(id) on delete cascade
 );
+-- RLS for products
+alter table "products" enable row level security;
+create policy "Allow authenticated users to manage products" on "products" for all using (auth.role() = 'authenticated');
 
--- 3. Tabel Kios (Kiosks)
-CREATE TABLE kiosks (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    name text NOT NULL,
-    address text NOT NULL,
-    phone text NOT NULL,
-    desa text NOT NULL,
-    kecamatan text NOT NULL,
-    penanggungJawab text NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+
+-- 3. Kios (Kiosks)
+-- Menyimpan data kios pelanggan.
+drop table if exists "kiosks" cascade;
+create table "kiosks" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "name" text not null,
+    "address" text,
+    "phone" text,
+    "desa" text,
+    "kecamatan" text,
+    "penanggungJawab" text,
+    "branchId" uuid not null references "branches"(id) on delete cascade
 );
+-- RLS for kiosks
+alter table "kiosks" enable row level security;
+create policy "Allow authenticated users to manage kiosks" on "kiosks" for all using (auth.role() = 'authenticated');
 
--- 4. Tabel Penebusan (Redemptions)
-CREATE TABLE redemptions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    doNumber text NOT NULL UNIQUE,
-    supplier text NOT NULL,
-    date date NOT NULL,
-    productId uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    quantity integer NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+
+-- 4. Penebusan (Redemptions)
+-- Mencatat penebusan pupuk dari supplier.
+drop table if exists "redemptions" cascade;
+create table "redemptions" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "doNumber" text not null,
+    "supplier" text,
+    "date" date not null,
+    "productId" uuid not null references "products"(id) on delete cascade,
+    "quantity" double precision not null,
+    "branchId" uuid not null references "branches"(id) on delete cascade
 );
+alter table "redemptions" add constraint redemptions_doNumber_branchId_unique unique ("doNumber", "branchId");
+-- RLS for redemptions
+alter table "redemptions" enable row level security;
+create policy "Allow authenticated users to manage redemptions" on "redemptions" for all using (auth.role() = 'authenticated');
 
--- 5. Tabel Pengeluaran DO (DOReleases)
-CREATE TABLE doReleases (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    doNumber text NOT NULL REFERENCES redemptions(doNumber) ON DELETE CASCADE,
-    date date NOT NULL,
-    quantity integer NOT NULL,
-    redemptionQuantity integer NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+
+-- 5. Pengeluaran DO (DOReleases)
+-- Mencatat pengeluaran barang dari gudang berdasarkan DO.
+drop table if exists "doReleases" cascade;
+create table "doReleases" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "doNumber" text not null,
+    "date" date not null,
+    "quantity" double precision not null,
+    "redemptionQuantity" double precision not null default 0,
+    "branchId" uuid not null references "branches"(id) on delete cascade,
+    foreign key ("doNumber", "branchId") references "redemptions"("doNumber", "branchId") on delete cascade
 );
+-- RLS for doReleases
+alter table "doReleases" enable row level security;
+create policy "Allow authenticated users to manage DO releases" on "doReleases" for all using (auth.role() = 'authenticated');
 
--- 6. Tabel Penyaluran Kios (KioskDistributions)
-CREATE TABLE kioskDistributions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    doNumber text NOT NULL REFERENCES redemptions(doNumber) ON DELETE CASCADE,
-    date date NOT NULL,
-    kioskId uuid NOT NULL REFERENCES kiosks(id) ON DELETE CASCADE,
-    namaSopir text NOT NULL,
-    jamAngkut text NOT NULL,
-    quantity integer NOT NULL,
-    directPayment numeric NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+
+-- 6. Penyaluran Kios (KioskDistributions)
+-- Mencatat penyaluran barang ke kios.
+drop table if exists "kioskDistributions" cascade;
+create table "kioskDistributions" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "doNumber" text not null,
+    "date" date not null,
+    "kioskId" uuid not null references "kiosks"(id) on delete cascade,
+    "namaSopir" text,
+    "jamAngkut" text,
+    "quantity" double precision not null,
+    "directPayment" double precision not null default 0,
+    "branchId" uuid not null references "branches"(id) on delete cascade
 );
+-- RLS for kioskDistributions
+alter table "kioskDistributions" enable row level security;
+create policy "Allow authenticated users to manage kiosk distributions" on "kioskDistributions" for all using (auth.role() = 'authenticated');
 
--- 7. Tabel Pembayaran (Payments)
-CREATE TABLE payments (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    date date NOT NULL,
-    doNumber text NOT NULL REFERENCES redemptions(doNumber) ON DELETE CASCADE,
-    kioskId uuid NOT NULL REFERENCES kiosks(id) ON DELETE CASCADE,
-    amount numeric NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+
+-- 7. Pembayaran (Payments)
+-- Mencatat pembayaran tempo dari kios.
+drop table if exists "payments" cascade;
+create table "payments" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "date" date not null,
+    "doNumber" text not null,
+    "kioskId" uuid not null references "kiosks"(id) on delete cascade,
+    "amount" double precision not null,
+    "branchId" uuid not null references "branches"(id) on delete cascade
 );
+-- RLS for payments
+alter table "payments" enable row level security;
+create policy "Allow authenticated users to manage payments" on "payments" for all using (auth.role() = 'authenticated');
 
--- 8. Tabel Kas Umum (KasUmum)
-CREATE TABLE kasUmum (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    date date NOT NULL,
-    description text NOT NULL,
-    type text NOT NULL CHECK (type IN ('debit', 'credit')),
-    quantity integer NOT NULL,
-    unitPrice numeric NOT NULL,
-    total numeric NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+
+-- 8. Kas Umum (KasUmum)
+-- Buku kas umum untuk pemasukan dan pengeluaran di luar transaksi utama.
+drop table if exists "kasUmum" cascade;
+create table "kasUmum" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "date" date not null,
+    "description" text not null,
+    "type" text not null, -- 'debit' or 'credit'
+    "quantity" double precision not null default 1,
+    "unitPrice" double precision not null,
+    "total" double precision not null,
+    "branchId" uuid not null references "branches"(id) on delete cascade
 );
+-- RLS for kasUmum
+alter table "kasUmum" enable row level security;
+create policy "Allow authenticated users to manage kas umum" on "kasUmum" for all using (auth.role() = 'authenticated');
 
--- 9. Tabel Kas Angkutan (KasAngkutan)
-CREATE TABLE kasAngkutan (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    date date NOT NULL,
-    type text NOT NULL CHECK (type IN ('pemasukan', 'pengeluaran')),
-    uangMasuk numeric DEFAULT 0 NOT NULL,
-    pengeluaran numeric DEFAULT 0 NOT NULL,
-    doNumber text,
-    namaSopir text,
-    uraian text NOT NULL,
-    adminFee numeric DEFAULT 0 NOT NULL,
-    uangMakan numeric DEFAULT 0 NOT NULL,
-    palang numeric DEFAULT 0 NOT NULL,
-    solar numeric DEFAULT 0 NOT NULL,
-    upahSopir numeric DEFAULT 0 NOT NULL,
-    lembur numeric DEFAULT 0 NOT NULL,
-    helper numeric DEFAULT 0 NOT NULL,
-    branchId uuid NOT NULL REFERENCES branches(id) ON DELETE CASCADE
+
+-- 9. Kas Angkutan (KasAngkutan)
+-- Buku kas khusus untuk biaya transportasi/angkutan.
+drop table if exists "kasAngkutan" cascade;
+create table "kasAngkutan" (
+    "id" uuid primary key default gen_random_uuid(),
+    "created_at" timestamp with time zone not null default now(),
+    "date" date not null,
+    "type" text not null, -- 'pemasukan' or 'pengeluaran'
+    "uangMasuk" double precision not null default 0,
+    "pengeluaran" double precision not null default 0,
+    "doNumber" text,
+    "namaSopir" text,
+    "uraian" text not null,
+    "adminFee" double precision not null default 0,
+    "uangMakan" double precision not null default 0,
+    "palang" double precision not null default 0,
+    "solar" double precision not null default 0,
+    "upahSopir" double precision not null default 0,
+    "lembur" double precision not null default 0,
+    "helper" double precision not null default 0,
+    "branchId" uuid not null references "branches"(id) on delete cascade
 );
-
--- AKTIFKAN ROW LEVEL SECURITY & BUAT KEBIJAKAN (POLICIES)
--- Ini mengizinkan pengguna yang sudah login untuk mengakses data.
-
-ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to read branches" ON branches FOR SELECT USING (auth.role() = 'authenticated');
-
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage products" ON products FOR ALL USING (auth.role() = 'authenticated');
-
-ALTER TABLE kiosks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage kiosks" ON kiosks FOR ALL USING (auth.role() = 'authenticated');
-
-ALTER TABLE redemptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage redemptions" ON redemptions FOR ALL USING (auth.role() = 'authenticated');
-
-ALTER TABLE doReleases ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage DO releases" ON doReleases FOR ALL USING (auth.role() = 'authenticated');
-
-ALTER TABLE kioskDistributions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage kiosk distributions" ON kioskDistributions FOR ALL USING (auth.role() = 'authenticated');
-
-ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage payments" ON payments FOR ALL USING (auth.role() = 'authenticated');
-
-ALTER TABLE kasUmum ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage kas umum" ON kasUmum FOR ALL USING (auth.role() = 'authenticated');
-
-ALTER TABLE kasAngkutan ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow logged-in users to manage kas angkutan" ON kasAngkutan FOR ALL USING (auth.role() = 'authenticated');
+-- RLS for kasAngkutan
+alter table "kasAngkutan" enable row level security;
+create policy "Allow authenticated users to manage kas angkutan" on "kasAngkutan" for all using (auth.role() = 'authenticated');
