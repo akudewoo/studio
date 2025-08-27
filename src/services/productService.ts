@@ -35,7 +35,7 @@ export async function getProducts(branchId: string): Promise<Product[]> {
     return data || [];
 }
 
-export async function updateProduct(id: string, product: Partial<Product>): Promise<void> {
+export async function updateProduct(id: string, product: Partial<ProductInput>): Promise<void> {
     const { error } = await supabase
         .from(TABLE_NAME)
         .update(product)

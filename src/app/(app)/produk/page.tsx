@@ -31,12 +31,11 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, Redemption, DORelease, ProductInput } from '@/lib/types';
-import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultipleProducts, addMultipleProducts } from '@/services/productService';
-import { getRedemptions } from '@/services/redemptionService';
-import { getDOReleases } from '@/services/doReleaseService';
+import { addProduct, updateProduct, deleteProduct, deleteMultipleProducts, addMultipleProducts } from '@/services/productService';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
 import { useAuth } from '@/hooks/use-auth';
+import { useData } from '@/hooks/use-data';
 
 
 const productSchema = z.object({
@@ -52,10 +51,10 @@ type SortConfig = {
 
 export default function ProdukPage() {
   const { user } = useAuth();
-  const { activeBranch, getBranchName, loading: branchLoading } = useBranch();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
-  const [doReleases, setDoReleases] = useState<DORelease[]>([]);
+  const { activeBranch, getBranchName } = useBranch();
+  const { data, loading, refetchData } = useData();
+  const { products, redemptions, doReleases } = data;
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -63,25 +62,6 @@ export default function ProdukPage() {
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    async function loadData() {
-      if (!activeBranch || branchLoading) return;
-      try {
-        setProducts(await getProducts(activeBranch.id));
-        setRedemptions(await getRedemptions(activeBranch.id));
-        setDoReleases(await getDOReleases(activeBranch.id));
-      } catch (error) {
-        console.error("Data loading error: ", error);
-        toast({
-          title: 'Gagal Memuat Data',
-          description: 'Gagal memuat data dari database.',
-          variant: 'destructive',
-        });
-      }
-    }
-    loadData();
-  }, [activeBranch, branchLoading, toast]);
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
@@ -201,16 +181,14 @@ export default function ProdukPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const originalProducts = [...products];
-    setProducts(products.filter((p) => p.id !== id));
     try {
       await deleteProduct(id);
+      await refetchData();
       toast({
         title: 'Sukses',
         description: 'Produk berhasil dihapus.',
       });
     } catch (error) {
-      setProducts(originalProducts);
       toast({
         title: 'Error',
         description: 'Gagal menghapus produk.',
@@ -225,45 +203,31 @@ export default function ProdukPage() {
         return;
     };
 
-    if (editingProduct) {
-      const originalProducts = [...products];
-      const updatedProduct = { ...editingProduct, ...values };
-      setProducts(products.map((p) => (p.id === editingProduct.id ? updatedProduct : p)));
-      
-      try {
+    try {
+      if (editingProduct) {
         await updateProduct(editingProduct.id, values);
         toast({
           title: 'Sukses',
           description: 'Produk berhasil diperbarui.',
         });
-      } catch (error) {
-        setProducts(originalProducts);
-        toast({
-          title: 'Error',
-          description: 'Gagal memperbarui produk.',
-          variant: 'destructive',
-        });
-      } finally {
-        setEditingProduct(null);
-      }
-    } else {
-      const optimisticProduct: ProductInput = { ...values, branchId: activeBranch.id };
-      try {
-        const newProduct = await addProduct(optimisticProduct);
-        setProducts(prevProducts => [...prevProducts, newProduct]);
+      } else {
+        const optimisticProduct: ProductInput = { ...values, branchId: activeBranch.id };
+        await addProduct(optimisticProduct);
         toast({
           title: 'Sukses',
           description: 'Produk baru berhasil ditambahkan.',
         });
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Gagal menyimpan produk.',
-          variant: 'destructive',
-        });
       }
+      await refetchData();
+      setIsDialogOpen(false);
+      setEditingProduct(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Gagal menyimpan produk.',
+        variant: 'destructive',
+      });
     }
-    setIsDialogOpen(false);
   };
   
 
@@ -284,20 +248,15 @@ export default function ProdukPage() {
   };
   
   const handleDeleteSelected = async () => {
-    const originalProducts = [...products];
-    const productsToDelete = selectedProducts;
-
-    setProducts(products.filter(p => !productsToDelete.includes(p.id)));
-    setSelectedProducts([]);
-
     try {
-      await deleteMultipleProducts(productsToDelete);
+      await deleteMultipleProducts(selectedProducts);
+      setSelectedProducts([]);
+      await refetchData();
       toast({
         title: 'Sukses',
-        description: `${productsToDelete.length} produk berhasil dihapus.`,
+        description: `${selectedProducts.length} produk berhasil dihapus.`,
       });
     } catch (error) {
-      setProducts(originalProducts);
       toast({
         title: 'Error',
         description: 'Gagal menghapus produk terpilih.',
@@ -381,11 +340,11 @@ export default function ProdukPage() {
             }
 
             if (newProducts.length > 0) {
-                const addedProducts = await addMultipleProducts(newProducts);
-                setProducts(prev => [...prev, ...addedProducts]);
+                await addMultipleProducts(newProducts);
+                await refetchData();
                 toast({
                     title: 'Sukses',
-                    description: `${addedProducts.length} produk berhasil diimpor.`,
+                    description: `${newProducts.length} produk berhasil diimpor.`,
                 });
             } else {
                  toast({
@@ -410,7 +369,7 @@ export default function ProdukPage() {
   };
 
 
-  if (branchLoading) {
+  if (loading) {
     return <div>Loading...</div>
   }
 

@@ -10,51 +10,13 @@ import { Package, Store, CircleDollarSign, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
-
-import { getKiosks } from '@/services/kioskService';
-import { getProducts } from '@/services/productService';
-import { getRedemptions } from '@/services/redemptionService';
-import { getDOReleases } from '@/services/doReleaseService';
-import { getKioskDistributions } from '@/services/kioskDistributionService';
-import { getPayments } from '@/services/paymentService';
-
-import type { Kiosk, Product, Redemption, DORelease, KioskDistribution, Payment } from '@/lib/types';
+import { useData } from '@/hooks/use-data';
 import { useBranch } from '@/hooks/use-branch';
+import type { Kiosk, Product, Redemption, DORelease, KioskDistribution, Payment } from '@/lib/types';
 
 export default function DashboardPage() {
-  const { activeBranch, loading: branchLoading } = useBranch();
-  const [data, setData] = useState<{
-    kiosks: Kiosk[];
-    products: Product[];
-    redemptions: Redemption[];
-    doReleases: DORelease[];
-    distributions: KioskDistribution[];
-    payments: Payment[];
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadData() {
-      if (!activeBranch || branchLoading) return;
-      try {
-        setLoading(true);
-        const [kiosks, products, redemptions, doReleases, distributions, payments] = await Promise.all([
-          getKiosks(activeBranch.id),
-          getProducts(activeBranch.id),
-          getRedemptions(activeBranch.id),
-          getDOReleases(activeBranch.id),
-          getKioskDistributions(activeBranch.id),
-          getPayments(activeBranch.id),
-        ]);
-        setData({ kiosks, products, redemptions, doReleases, distributions, payments });
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, [activeBranch, branchLoading]);
+  const { activeBranch } = useBranch();
+  const { data, loading } = useData();
 
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
@@ -76,7 +38,7 @@ export default function DashboardPage() {
   };
 
   const dashboardMetrics = useMemo(() => {
-    if (!data) return {
+    if (!data || loading) return {
       totalKiosks: 0,
       totalStock: 0,
       totalOutstanding: 0,
@@ -176,9 +138,9 @@ export default function DashboardPage() {
 
 
     return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks, monthlySales, topSellingProducts };
-  }, [data]);
+  }, [data, loading]);
   
-  if (loading || branchLoading) {
+  if (loading) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
           <h1 className="font-headline text-lg font-semibold md:text-2xl">Dasbor</h1>
