@@ -35,8 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { Redemption, Product, RedemptionInput } from '@/lib/types';
-import { getRedemptions, addRedemption, updateRedemption, deleteRedemption, deleteMultipleRedemptions, addMultipleRedemptions } from '@/services/redemptionService';
-import { getProducts } from '@/services/productService';
+import { getRedemptions, getProducts } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
@@ -78,7 +77,7 @@ export default function PenebusanPage() {
       } catch (error) {
         toast({
           title: 'Gagal memuat data',
-          description: 'Terjadi kesalahan saat memuat data dari database.',
+          description: 'Terjadi kesalahan saat memuat data dari file lokal.',
           variant: 'destructive',
         });
       }
@@ -206,77 +205,13 @@ export default function PenebusanPage() {
     }
     setIsDialogOpen(true);
   };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteRedemption(id);
-      setRedemptions(redemptions.filter((r) => r.id !== id));
-      toast({
-        title: 'Sukses',
-        description: 'Data penebusan berhasil dihapus.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menghapus data penebusan.',
-        variant: 'destructive',
-      });
-    }
-  };
-
+  
   const handleDeleteSelected = async () => {
-    try {
-      await deleteMultipleRedemptions(selectedRedemptions);
-      setRedemptions(redemptions.filter(r => !selectedRedemptions.includes(r.id)));
-      setSelectedRedemptions([]);
-       toast({
-        title: 'Sukses',
-        description: `${selectedRedemptions.length} penebusan berhasil dihapus.`,
-      });
-    } catch (error) {
-       toast({
-        title: 'Error',
-        description: 'Gagal menghapus penebusan terpilih.',
-        variant: 'destructive',
-      });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menghapus data tidak diizinkan dalam mode demo.' });
   };
 
   const onSubmit = async (values: z.infer<typeof redemptionSchema>) => {
-    if (!activeBranch || activeBranch.id === 'all') {
-        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
-        return;
-    }
-    const redemptionData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
-    try {
-      if (editingRedemption) {
-        await updateRedemption(editingRedemption.id, redemptionData);
-        setRedemptions(
-          redemptions.map((r) =>
-            r.id === editingRedemption.id ? { id: r.id, ...redemptionData } : r
-          )
-        );
-        toast({
-          title: 'Sukses',
-          description: 'Data penebusan berhasil diperbarui.',
-        });
-      } else {
-        const newRedemption = await addRedemption(redemptionData);
-        setRedemptions([ ...redemptions, newRedemption ]);
-        toast({
-          title: 'Sukses',
-          description: 'Penebusan baru berhasil ditambahkan.',
-        });
-      }
-      setIsDialogOpen(false);
-      setEditingRedemption(null);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menyimpan data penebusan.',
-        variant: 'destructive',
-      });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menyimpan data tidak diizinkan dalam mode demo.' });
   };
   
   const handleSelectAll = (checked: boolean) => {
@@ -345,83 +280,7 @@ export default function PenebusanPage() {
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !activeBranch || activeBranch.id === 'all') {
-        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-            const productNameToIdMap = products.reduce((map, p) => {
-              map[p.name] = p.id;
-              return map;
-            }, {} as Record<string, string>);
-
-            const newRedemptions: RedemptionInput[] = [];
-            for (const item of json) {
-                const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
-                const productId = productNameToIdMap[item['Nama Produk']];
-                if (!productId) {
-                  console.warn(`Product not found for: ${item['Nama Produk']}`);
-                  continue;
-                }
-
-                const redemptionData = {
-                    doNumber: String(item['NO DO']),
-                    supplier: item['Supplier'],
-                    date: excelDate,
-                    productId: productId,
-                    quantity: item['QTY'],
-                    branchId: activeBranch.id,
-                };
-                
-                const parsed = redemptionSchema.strip().safeParse(redemptionData);
-                if (parsed.success) {
-                    newRedemptions.push({
-                      ...parsed.data,
-                      date: parsed.data.date.toISOString(),
-                      branchId: activeBranch.id
-                    });
-                } else {
-                    console.warn('Invalid item skipped:', item, parsed.error);
-                }
-            }
-
-            if (newRedemptions.length > 0) {
-                const addedRedemptions = await addMultipleRedemptions(newRedemptions);
-                setRedemptions(prev => [...prev, ...addedRedemptions]);
-                toast({
-                    title: 'Sukses',
-                    description: `${addedRedemptions.length} penebusan berhasil diimpor.`,
-                });
-            } else {
-                 toast({
-                    title: 'Tidak Ada Data',
-                    description: 'Tidak ada data penebusan yang valid untuk diimpor.',
-                    variant: 'destructive',
-                });
-            }
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Gagal mengimpor file. Pastikan format file dan nama produk benar.',
-                variant: 'destructive',
-            });
-        } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-    reader.readAsArrayBuffer(file);
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Impor data tidak diizinkan dalam mode demo.' });
   };
 
 
@@ -471,7 +330,7 @@ export default function PenebusanPage() {
                 accept=".xlsx, .xls, .csv"
                 onChange={handleImport}
             />
-            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled>
                 <Upload className="mr-2 h-4 w-4" />
                 Impor
             </Button>
@@ -566,15 +425,15 @@ export default function PenebusanPage() {
                     <TableCell className="px-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-6 w-6 p-0">
+                          <Button variant="ghost" className="h-6 w-6 p-0" disabled>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleDialogOpen(redemption)}>
+                          <DropdownMenuItem disabled>
                             <Edit className="mr-2 h-4 w-4" /> Ubah
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(redemption.id)}>
+                          <DropdownMenuItem className="text-destructive" disabled>
                             <Trash2 className="mr-2 h-4 w-4" /> Hapus
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -598,7 +457,7 @@ export default function PenebusanPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
               <FormField name="doNumber" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>NO DO</FormLabel><FormControl><Input placeholder="cth. DO-2024-001" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>NO DO</FormLabel><FormControl><Input placeholder="cth. DO-2024-001" {...field} disabled /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField
                 control={form.control}
@@ -606,7 +465,7 @@ export default function PenebusanPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Supplier</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih supplier" />
@@ -636,6 +495,7 @@ export default function PenebusanPage() {
                               'w-full pl-3 text-left font-normal',
                               !field.value && 'text-muted-foreground'
                             )}
+                            disabled
                           >
                             {field.value ? (
                               format(field.value, 'dd/MM/yyyy')
@@ -651,9 +511,7 @@ export default function PenebusanPage() {
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date('1900-01-01')
-                          }
+                          disabled
                           initialFocus
                         />
                       </PopoverContent>
@@ -665,7 +523,7 @@ export default function PenebusanPage() {
               <FormField name="productId" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nama Produk</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled>
                     <FormControl><SelectTrigger><SelectValue placeholder="Pilih produk" /></SelectTrigger></FormControl>
                     <SelectContent>
                       {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
@@ -675,11 +533,11 @@ export default function PenebusanPage() {
                 </FormItem>
               )} />
               <FormField name="quantity" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>QTY</FormLabel><FormControl><Input type="number" placeholder="cth. 1000" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>QTY</FormLabel><FormControl><Input type="number" placeholder="cth. 1000" {...field} disabled /></FormControl><FormMessage /></FormItem>
               )} />
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Batal</Button></DialogClose>
-                <Button type="submit">{editingRedemption ? 'Simpan' : 'Tambah'}</Button>
+                <Button type="submit" disabled>{editingRedemption ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>
             </form>
           </Form>

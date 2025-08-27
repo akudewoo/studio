@@ -33,8 +33,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from '@/hooks/use-toast';
 import type { KasAngkutan, KasAngkutanInput, KioskDistribution } from '@/lib/types';
-import { addKasAngkutan, getKasAngkutan, updateKasAngkutan, deleteKasAngkutan, deleteMultipleKasAngkutan } from '@/services/kasAngkutanService';
-import { getKioskDistributions } from '@/services/kioskDistributionService';
+import { getKasAngkutan, getKioskDistributions } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { useBranch } from '@/hooks/use-branch';
@@ -218,100 +217,13 @@ export default function KasAngkutanPage() {
     }
     setIsDialogOpen(true);
   };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteKasAngkutan(id);
-      setKasList(kasList.filter((k) => k.id !== id));
-      toast({ title: 'Sukses', description: 'Data kas berhasil dihapus.' });
-    } catch (error) {
-      toast({ title: 'Error', description: 'Gagal menghapus data kas.', variant: 'destructive' });
-    }
-  };
   
   const handleDeleteSelected = async () => {
-    try {
-      await deleteMultipleKasAngkutan(selectedKas);
-      setKasList(kasList.filter(k => !selectedKas.includes(k.id)));
-      setSelectedKas([]);
-      toast({ title: 'Sukses', description: `${selectedKas.length} data kas berhasil dihapus.` });
-    } catch (error) {
-       toast({ title: 'Error', description: 'Gagal menghapus data kas terpilih.', variant: 'destructive' });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menghapus data tidak diizinkan dalam mode demo.' });
   };
 
   const onSubmit = async (values: z.infer<typeof kasAngkutanSchema>) => {
-    if (!activeBranch || activeBranch.id === 'all') {
-      toast({ title: 'Error', description: 'Pilih cabang spesifik.', variant: 'destructive' });
-      return;
-    }
-    
-    let kasData: KasAngkutanInput;
-
-    if (values.type === 'pengeluaran') {
-        if (values.distributionId) {
-            const distribution = distributions.find(d => d.id === values.distributionId);
-            if (!distribution) {
-              toast({ title: 'Error', description: 'Data distribusi tidak ditemukan.', variant: 'destructive' });
-              return;
-            }
-            const qty = distribution.quantity;
-            const jamAngkut = parse(distribution.jamAngkut, 'HH:mm', new Date());
-            const jamLembur = parse('14:00', 'HH:mm', new Date());
-            kasData = {
-                date: values.date.toISOString(),
-                type: 'pengeluaran',
-                uangMasuk: 0,
-                pengeluaran: 0,
-                doNumber: distribution.doNumber,
-                namaSopir: distribution.namaSopir,
-                uraian: values.uraian || `Biaya DO: ${distribution.doNumber}`,
-                adminFee: 3125 * qty,
-                uangMakan: 40000,
-                palang: 5000 * qty,
-                solar: 12500 * qty,
-                upahSopir: 3500 * qty,
-                lembur: jamAngkut > jamLembur ? 2000 * qty : 0,
-                helper: 5000 * qty,
-                branchId: activeBranch.id,
-            };
-        } else {
-             kasData = {
-                date: values.date.toISOString(),
-                type: 'pengeluaran',
-                uangMasuk: 0,
-                pengeluaran: values.pengeluaran,
-                uraian: values.uraian,
-                adminFee: 0, uangMakan: 0, palang: 0, solar: 0, upahSopir: 0, lembur: 0, helper: 0,
-                branchId: activeBranch.id,
-            };
-        }
-    } else { // Pemasukan
-        kasData = {
-            date: values.date.toISOString(),
-            type: 'pemasukan',
-            uangMasuk: values.uangMasuk,
-            pengeluaran: 0,
-            uraian: values.uraian,
-            adminFee: 0, uangMakan: 0, palang: 0, solar: 0, upahSopir: 0, lembur: 0, helper: 0,
-            branchId: activeBranch.id,
-        };
-    }
-
-    try {
-      if (editingKas) {
-        await updateKasAngkutan(editingKas.id, kasData);
-        setKasList(kasList.map((k) => (k.id === editingKas.id ? { ...editingKas, ...kasData } : k)));
-        toast({ title: 'Sukses', description: 'Data kas berhasil diperbarui.' });
-      } else {
-        const newKas = await addKasAngkutan(kasData);
-        setKasList([...kasList, newKas]);
-        toast({ title: 'Sukses', description: 'Data kas baru berhasil ditambahkan.' });
-      }
-      setIsDialogOpen(false);
-    } catch (error) {
-      toast({ title: 'Error', description: 'Gagal menyimpan data kas.', variant: 'destructive' });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menyimpan data tidak diizinkan dalam mode demo.' });
   };
   
   const handleSelectAll = (checked: boolean) => {
@@ -446,10 +358,10 @@ export default function KasAngkutanPage() {
                   <TableCell className="px-2 text-right font-bold">{formatCurrency((kas as any).saldo)}</TableCell>
                   <TableCell className="px-2">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0" disabled><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDialogOpen(kas)}><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(kas.id)}><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>
+                        <DropdownMenuItem disabled><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" disabled><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -491,7 +403,7 @@ export default function KasAngkutanPage() {
                                   }}
                                   value={field.value}
                                   className="flex space-x-4"
-                                  disabled={!!editingKas}
+                                  disabled={!!editingKas || true}
                               >
                                   <FormItem className="flex items-center space-x-2">
                                       <FormControl><RadioGroupItem value="pemasukan" id="pemasukan" /></FormControl>
@@ -516,14 +428,14 @@ export default function KasAngkutanPage() {
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal',!field.value && 'text-muted-foreground')}>
+                          <Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal',!field.value && 'text-muted-foreground')} disabled>
                             {field.value ? format(field.value, 'dd/MM/yyyy') : <span>Pilih tanggal</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date('1900-01-01')} initialFocus/>
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled initialFocus/>
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -548,31 +460,31 @@ export default function KasAngkutanPage() {
                                     placeholder="Pilih Distribusi (jika ada)"
                                     searchPlaceholder="Cari NO DO atau Sopir..."
                                     emptyPlaceholder="Distribusi tidak ditemukan"
-                                    disabled={!!editingKas}
+                                    disabled={!!editingKas || true}
                                 />
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
                     <FormField control={form.control} name="pengeluaran" render={({ field }) => (
-                      <FormItem><FormLabel>Nominal Pengeluaran</FormLabel><FormControl><Input type="number" placeholder="0" {...field} disabled={!!distributionId} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>Nominal Pengeluaran</FormLabel><FormControl><Input type="number" placeholder="0" {...field} disabled={!!distributionId || true} /></FormControl><FormMessage /></FormItem>
                     )}/>
                   </>
                )}
 
                {transactionType === 'pemasukan' && (
                   <FormField control={form.control} name="uangMasuk" render={({ field }) => (
-                    <FormItem><FormLabel>Uang Masuk</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Uang Masuk</FormLabel><FormControl><Input type="number" placeholder="0" {...field} disabled /></FormControl><FormMessage /></FormItem>
                   )}/>
                )}
 
               <FormField control={form.control} name="uraian" render={({ field }) => (
-                  <FormItem><FormLabel>Uraian</FormLabel><FormControl><Input placeholder="cth. Pemasukan dari kasir atau Biaya tak terduga" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Uraian</FormLabel><FormControl><Input placeholder="cth. Pemasukan dari kasir atau Biaya tak terduga" {...field} disabled/></FormControl><FormMessage /></FormItem>
               )}/>
 
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Batal</Button></DialogClose>
-                <Button type="submit">{editingKas ? 'Simpan' : 'Tambah'}</Button>
+                <Button type="submit" disabled>{editingKas ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>
             </form>
           </Form>

@@ -31,9 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, Redemption, DORelease, ProductInput } from '@/lib/types';
-import { getProducts, addProduct, updateProduct, deleteProduct, deleteMultipleProducts, addMultipleProducts } from '@/services/productService';
-import { getRedemptions } from '@/services/redemptionService';
-import { getDOReleases } from '@/services/doReleaseService';
+import { getProducts, getRedemptions, getDOReleases } from '@/lib/data-service';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
 import { useAuth } from '@/hooks/use-auth';
@@ -83,7 +81,7 @@ export default function ProdukPage() {
     } catch (error) {
        toast({
         title: 'Gagal memuat data',
-        description: 'Terjadi kesalahan saat memuat data produk.',
+        description: 'Terjadi kesalahan saat memuat data produk dari file lokal.',
         variant: 'destructive',
       });
     } finally {
@@ -213,57 +211,10 @@ export default function ProdukPage() {
     }
     setIsDialogOpen(true);
   };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteProduct(id);
-      await refetchData();
-      toast({
-        title: 'Sukses',
-        description: 'Produk berhasil dihapus.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menghapus produk.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const onSubmit = async (values: z.infer<typeof productSchema>) => {
-    if (!activeBranch || activeBranch.id === 'all') {
-        toast({ title: 'Error', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah produk.', variant: 'destructive' });
-        return;
-    };
-
-    try {
-      if (editingProduct) {
-        await updateProduct(editingProduct.id, values);
-        toast({
-          title: 'Sukses',
-          description: 'Produk berhasil diperbarui.',
-        });
-      } else {
-        const optimisticProduct: ProductInput = { ...values, branchId: activeBranch.id };
-        await addProduct(optimisticProduct);
-        toast({
-          title: 'Sukses',
-          description: 'Produk baru berhasil ditambahkan.',
-        });
-      }
-      await refetchData();
-      setIsDialogOpen(false);
-      setEditingProduct(null);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menyimpan produk.',
-        variant: 'destructive',
-      });
-    }
-  };
   
+  const onSubmit = async (values: z.infer<typeof productSchema>) => {
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menyimpan data tidak diizinkan dalam mode demo.' });
+  };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -282,21 +233,7 @@ export default function ProdukPage() {
   };
   
   const handleDeleteSelected = async () => {
-    try {
-      await deleteMultipleProducts(selectedProducts);
-      setSelectedProducts([]);
-      await refetchData();
-      toast({
-        title: 'Sukses',
-        description: `${selectedProducts.length} produk berhasil dihapus.`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menghapus produk terpilih.',
-        variant: 'destructive',
-      });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menghapus data tidak diizinkan dalam mode demo.' });
   };
   
   const handleExportExcel = () => {
@@ -340,66 +277,7 @@ export default function ProdukPage() {
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!fileInputRef.current?.files || !activeBranch || activeBranch.id === 'all') {
-      toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
-      return;
-    }
-    const file = fileInputRef.current.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-            const newProducts: ProductInput[] = [];
-            for (const item of json) {
-                const productData = {
-                    name: item['Nama Produk'],
-                    purchasePrice: item['Harga Beli'],
-                    sellPrice: item['Harga Jual'],
-                    branchId: activeBranch.id,
-                };
-                
-                const parsed = productSchema.strip().safeParse(productData);
-                if (parsed.success) {
-                    newProducts.push({ ...parsed.data, branchId: activeBranch.id });
-                } else {
-                    console.warn('Invalid item skipped:', item, parsed.error);
-                }
-            }
-
-            if (newProducts.length > 0) {
-                await addMultipleProducts(newProducts);
-                await refetchData();
-                toast({
-                    title: 'Sukses',
-                    description: `${newProducts.length} produk berhasil diimpor.`,
-                });
-            } else {
-                 toast({
-                    title: 'Tidak Ada Data',
-                    description: 'Tidak ada data produk yang valid untuk diimpor.',
-                    variant: 'destructive',
-                });
-            }
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Gagal mengimpor file. Pastikan format file benar.',
-                variant: 'destructive',
-            });
-        } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-    reader.readAsArrayBuffer(file);
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Impor data tidak diizinkan dalam mode demo.' });
   };
 
 
@@ -447,7 +325,7 @@ export default function ProdukPage() {
             accept=".xlsx, .xls, .csv"
             onChange={handleImport}
           />
-          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled>
               <Upload className="mr-2 h-4 w-4" />
               Impor
           </Button>
@@ -580,19 +458,19 @@ export default function ProdukPage() {
                   <TableCell className="px-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-6 w-6 p-0">
+                        <Button variant="ghost" className="h-6 w-6 p-0" disabled>
                           <span className="sr-only">Buka menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDialogOpen(product)}>
+                        <DropdownMenuItem disabled>
                           <Edit className="mr-2 h-4 w-4" />
                           Ubah
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => handleDelete(product.id)}
+                          disabled
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Hapus
@@ -635,7 +513,7 @@ export default function ProdukPage() {
                   <FormItem>
                     <FormLabel>Nama Produk</FormLabel>
                     <FormControl>
-                      <Input placeholder="cth. Pupuk Urea" {...field} />
+                      <Input placeholder="cth. Pupuk Urea" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -648,7 +526,7 @@ export default function ProdukPage() {
                   <FormItem>
                     <FormLabel>Harga Beli</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="cth. 2000" {...field} />
+                      <Input type="number" placeholder="cth. 2000" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -661,7 +539,7 @@ export default function ProdukPage() {
                   <FormItem>
                     <FormLabel>Harga Jual</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="cth. 2500" {...field} />
+                      <Input type="number" placeholder="cth. 2500" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -673,7 +551,7 @@ export default function ProdukPage() {
                     Batal
                   </Button>
                 </DialogClose>
-                <Button type="submit">{editingProduct ? 'Simpan' : 'Tambah'}</Button>
+                <Button type="submit" disabled>{editingProduct ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>
             </form>
           </Form>

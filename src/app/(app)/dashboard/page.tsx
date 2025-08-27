@@ -12,18 +12,11 @@ import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { useBranch } from '@/hooks/use-branch';
 import type { Kiosk, Product, Redemption, DORelease, KioskDistribution, Payment } from '@/lib/types';
-import { getKiosks } from '@/services/kioskService';
-import { getProducts } from '@/services/productService';
-import { getRedemptions } from '@/services/redemptionService';
-import { getDOReleases } from '@/services/doReleaseService';
-import { getKioskDistributions } from '@/services/kioskDistributionService';
-import { getPayments } from '@/services/paymentService';
-import { useToast } from '@/hooks/use-toast';
+import { getAllDataForBranch } from '@/lib/data-service';
 
 export default function DashboardPage() {
   const { activeBranch } = useBranch();
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
   const [data, setData] = useState<{
     kiosks: Kiosk[],
     products: Product[],
@@ -36,31 +29,18 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       if (!activeBranch) return;
-
       setLoading(true);
       try {
-        const [kiosks, products, redemptions, doReleases, distributions, payments] = await Promise.all([
-          getKiosks(activeBranch.id),
-          getProducts(activeBranch.id),
-          getRedemptions(activeBranch.id),
-          getDOReleases(activeBranch.id),
-          getKioskDistributions(activeBranch.id),
-          getPayments(activeBranch.id),
-        ]);
-        setData({ kiosks, products, redemptions, doReleases, distributions, payments });
+        const branchData = await getAllDataForBranch(activeBranch.id);
+        setData(branchData);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
-        toast({
-          title: 'Gagal memuat data',
-          description: 'Terjadi kesalahan saat memuat data dari database.',
-          variant: 'destructive',
-        });
       } finally {
         setLoading(false);
       }
     }
     loadData();
-  }, [activeBranch, toast]);
+  }, [activeBranch]);
 
 
   const formatCurrency = (value: number) => {

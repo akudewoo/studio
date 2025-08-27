@@ -35,7 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { KasUmum, KasUmumInput } from '@/lib/types';
-import { getKasUmum, addKasUmum, updateKasUmum, deleteKasUmum, deleteMultipleKasUmum, addMultipleKasUmum } from '@/services/kasUmumService';
+import { getKasUmum } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
@@ -197,44 +197,13 @@ export default function KasUmumPage() {
     }
     setIsDialogOpen(true);
   };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteKasUmum(id);
-      setKasList(kasList.filter((k) => k.id !== id));
-      toast({ title: 'Sukses', description: 'Data kas berhasil dihapus.' });
-    } catch (error) {
-      toast({ title: 'Error', description: 'Gagal menghapus data kas.', variant: 'destructive' });
-    }
-  };
   
   const handleDeleteSelected = async () => {
-    try {
-      await deleteMultipleKasUmum(selectedKas);
-      setKasList(kasList.filter(k => !selectedKas.includes(k.id)));
-      setSelectedKas([]);
-      toast({ title: 'Sukses', description: `${selectedKas.length} data kas berhasil dihapus.` });
-    } catch (error) {
-       toast({ title: 'Error', description: 'Gagal menghapus data kas terpilih.', variant: 'destructive' });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menghapus data tidak diizinkan dalam mode demo.' });
   };
 
   const onSubmit = async (values: z.infer<typeof kasUmumSchema>) => {
-    try {
-      const kasData = { ...values, date: values.date.toISOString() };
-      if (editingKas) {
-        await updateKasUmum(editingKas.id, kasData);
-        setKasList(kasList.map((k) => (k.id === editingKas.id ? { id: k.id, total: kasData.quantity * kasData.unitPrice, balance: 0, ...kasData } : k)));
-        toast({ title: 'Sukses', description: 'Data kas berhasil diperbarui.' });
-      } else {
-        const newKas = await addKasUmum(kasData);
-        setKasList([...kasList, newKas]);
-        toast({ title: 'Sukses', description: 'Data kas baru berhasil ditambahkan.' });
-      }
-      setIsDialogOpen(false);
-    } catch (error) {
-      toast({ title: 'Error', description: 'Gagal menyimpan data kas.', variant: 'destructive' });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menyimpan data tidak diizinkan dalam mode demo.' });
   };
   
   const handleSelectAll = (checked: boolean) => {
@@ -289,77 +258,7 @@ export default function KasUmumPage() {
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-            const branchNameToIdMap = branches.reduce((map, b) => {
-              map[b.name] = b.id;
-              return map;
-            }, {} as Record<string, string>);
-
-            const newKasItems: KasUmumInput[] = [];
-            for (const item of json) {
-                const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
-                
-                const branchId = activeBranch?.id === 'all'
-                    ? branchNameToIdMap[item['Kabupaten']]
-                    : activeBranch?.id;
-
-                if (!branchId) {
-                  console.warn(`Branch not found for: ${item['Kabupaten']}`);
-                  continue;
-                }
-
-                const debit = item['Debit'] || 0;
-                const credit = item['Kredit'] || 0;
-                const total = Math.max(debit, credit);
-
-                const kasData = {
-                    date: excelDate,
-                    description: item['Uraian'],
-                    type: debit > 0 ? 'debit' : 'credit',
-                    quantity: 1, // Default quantity to 1 on import
-                    unitPrice: total, // Use total as unit price
-                    branchId,
-                };
-                
-                const parsed = kasUmumSchema.strip().safeParse(kasData);
-                if (parsed.success) {
-                    newKasItems.push({
-                      ...parsed.data,
-                      date: parsed.data.date.toISOString(),
-                      total: 0,
-                    });
-                } else {
-                    console.warn('Invalid item skipped:', item, parsed.error);
-                }
-            }
-
-            if (newKasItems.length > 0) {
-                const addedItems = await addMultipleKasUmum(newKasItems);
-                setKasList(prev => [...prev, ...addedItems]);
-                toast({ title: 'Sukses', description: `${addedItems.length} data kas berhasil diimpor.` });
-            } else {
-                 toast({ title: 'Tidak Ada Data', description: 'Tidak ada data valid untuk diimpor.', variant: 'destructive' });
-            }
-        } catch (error) {
-            toast({ title: 'Error', description: 'Gagal mengimpor file. Pastikan format file dan nama cabang benar.', variant: 'destructive' });
-        } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-    reader.readAsArrayBuffer(file);
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Impor data tidak diizinkan dalam mode demo.' });
   };
 
   if (branchLoading) {
@@ -388,7 +287,7 @@ export default function KasUmumPage() {
             accept=".xlsx, .xls, .csv"
             onChange={handleImport}
           />
-          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled>
               <Upload className="mr-2 h-4 w-4" />
               Impor
           </Button>
@@ -484,10 +383,10 @@ export default function KasUmumPage() {
                   <TableCell className="text-right px-2 font-bold">{formatCurrency(kas.balance)}</TableCell>
                   <TableCell className="px-2">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0" disabled><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDialogOpen(kas)}><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(kas.id)}><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>
+                        <DropdownMenuItem disabled><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" disabled><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -520,14 +419,14 @@ export default function KasUmumPage() {
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal',!field.value && 'text-muted-foreground')}>
+                          <Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal',!field.value && 'text-muted-foreground')} disabled>
                             {field.value ? format(field.value, 'dd/MM/yyyy') : <span>Pilih tanggal</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date('1900-01-01')} initialFocus/>
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled initialFocus/>
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -535,11 +434,11 @@ export default function KasUmumPage() {
                 )}
               />
               <FormField control={form.control} name="description" render={({ field }) => (
-                  <FormItem className="col-span-2"><FormLabel>Uraian</FormLabel><FormControl><Input placeholder="cth. Pembelian ATK" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="col-span-2"><FormLabel>Uraian</FormLabel><FormControl><Input placeholder="cth. Pembelian ATK" {...field} disabled /></FormControl><FormMessage /></FormItem>
               )}/>
                <FormField control={form.control} name="type" render={({ field }) => (
                   <FormItem className="col-span-2"><FormLabel>Tipe</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled>
                       <FormControl><SelectTrigger><SelectValue placeholder="Pilih Tipe" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="debit">Pemasukan (Debit)</SelectItem>
@@ -549,15 +448,15 @@ export default function KasUmumPage() {
                   <FormMessage /></FormItem>
               )}/>
               <FormField control={form.control} name="quantity" render={({ field }) => (
-                  <FormItem><FormLabel>Jumlah</FormLabel><FormControl><Input type="number" placeholder="1" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Jumlah</FormLabel><FormControl><Input type="number" placeholder="1" {...field} disabled /></FormControl><FormMessage /></FormItem>
               )}/>
                <FormField control={form.control} name="unitPrice" render={({ field }) => (
-                  <FormItem><FormLabel>Harga Satuan</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Harga Satuan</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} disabled /></FormControl><FormMessage /></FormItem>
               )}/>
               {user?.role === 'owner' && (
                 <FormField control={form.control} name="branchId" render={({ field }) => (
                     <FormItem className="col-span-2"><FormLabel>Cabang</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!editingKas}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled>
                         <FormControl><SelectTrigger><SelectValue placeholder="Pilih Cabang" /></SelectTrigger></FormControl>
                         <SelectContent>
                             {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -568,7 +467,7 @@ export default function KasUmumPage() {
               )}
               <DialogFooter className="col-span-2">
                 <DialogClose asChild><Button type="button" variant="secondary">Batal</Button></DialogClose>
-                <Button type="submit">{editingKas ? 'Simpan' : 'Tambah'}</Button>
+                <Button type="submit" disabled>{editingKas ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>
             </form>
           </Form>

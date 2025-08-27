@@ -34,11 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import type { Payment, Kiosk, KioskDistribution, Product, Redemption, PaymentInput } from '@/lib/types';
-import { getPayments, addPayment, updatePayment, deletePayment, deleteMultiplePayments, addMultiplePayments } from '@/services/paymentService';
-import { getKioskDistributions } from '@/services/kioskDistributionService';
-import { getKiosks } from '@/services/kioskService';
-import { getProducts } from '@/services/productService';
-import { getRedemptions } from '@/services/redemptionService';
+import { getPayments, getKioskDistributions, getKiosks, getProducts, getRedemptions } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import { Combobox } from '@/components/ui/combobox';
 import { exportToPdf } from '@/lib/pdf-export';
@@ -122,7 +118,7 @@ export default function PembayaranPage() {
       } catch (error) {
         toast({
           title: 'Gagal memuat data',
-          description: 'Terjadi kesalahan saat memuat data dari database.',
+          description: 'Terjadi kesalahan saat memuat data dari file lokal.',
           variant: 'destructive',
         });
       }
@@ -254,55 +250,13 @@ export default function PembayaranPage() {
     else form.reset({ date: new Date(), doNumber: '', kioskId: '', amount: 0 });
     setIsDialogOpen(true);
   };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deletePayment(id);
-      setPayments(payments.filter((p) => p.id !== id));
-      toast({ title: 'Sukses', description: 'Data pembayaran berhasil dihapus.' });
-    } catch (error) {
-      toast({ title: 'Error', description: 'Gagal menghapus pembayaran.', variant: 'destructive' });
-    }
-  };
   
   const handleDeleteSelected = async () => {
-    try {
-      await deleteMultiplePayments(selectedPayments);
-      setPayments(payments.filter(p => !selectedPayments.includes(p.id)));
-      setSelectedPayments([]);
-      toast({
-        title: 'Sukses',
-        description: `${selectedPayments.length} pembayaran berhasil dihapus.`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menghapus pembayaran terpilih.',
-        variant: 'destructive',
-      });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menghapus data tidak diizinkan dalam mode demo.' });
   };
 
   const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
-    if (!activeBranch || activeBranch.id === 'all') {
-        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
-        return;
-    }
-    try {
-      const paymentData = { ...values, date: values.date.toISOString(), branchId: activeBranch.id };
-      if (editingPayment) {
-        await updatePayment(editingPayment.id, paymentData);
-        setPayments(payments.map((p) => (p.id === editingPayment.id ? { id: p.id, ...paymentData } : p)));
-        toast({ title: 'Sukses', description: 'Data pembayaran berhasil diperbarui.' });
-      } else {
-        const newPayment = await addPayment(paymentData);
-        setPayments([...payments, newPayment]);
-        toast({ title: 'Sukses', description: 'Pembayaran baru berhasil ditambahkan.' });
-      }
-      setIsDialogOpen(false);
-    } catch (error) {
-      toast({ title: 'Error', description: 'Gagal menyimpan pembayaran.', variant: 'destructive' });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menyimpan data tidak diizinkan dalam mode demo.' });
   };
   
   const handleLunas = () => {
@@ -385,82 +339,7 @@ export default function PembayaranPage() {
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !activeBranch || activeBranch.id === 'all') {
-        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-            const kioskNameToIdMap = kiosks.reduce((map, k) => {
-              map[k.name] = k.id;
-              return map;
-            }, {} as Record<string, string>);
-
-            const newPayments: PaymentInput[] = [];
-            for (const item of json) {
-                const excelDate = typeof item['Tanggal'] === 'number' ? new Date(1900, 0, item['Tanggal'] - 1) : new Date(item['Tanggal']);
-                const kioskId = kioskNameToIdMap[item['Nama Kios']];
-                if (!kioskId) {
-                  console.warn(`Kiosk not found for: ${item['Nama Kios']}`);
-                  continue;
-                }
-
-                const paymentData = {
-                    date: excelDate,
-                    doNumber: String(item['NO DO']),
-                    kioskId: kioskId,
-                    amount: item['Total Bayar'],
-                    branchId: activeBranch.id,
-                };
-                
-                const parsed = paymentSchema.strip().safeParse(paymentData);
-                if (parsed.success) {
-                    newPayments.push({
-                      ...parsed.data,
-                      date: parsed.data.date.toISOString(),
-                      branchId: activeBranch.id
-                    });
-                } else {
-                    console.warn('Invalid item skipped:', item, parsed.error);
-                }
-            }
-
-            if (newPayments.length > 0) {
-                const addedPayments = await addMultiplePayments(newPayments);
-                setPayments(prev => [...prev, ...addedPayments]);
-                toast({
-                    title: 'Sukses',
-                    description: `${addedPayments.length} pembayaran berhasil diimpor.`,
-                });
-            } else {
-                 toast({
-                    title: 'Tidak Ada Data',
-                    description: 'Tidak ada data yang valid untuk diimpor.',
-                    variant: 'destructive',
-                });
-            }
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Gagal mengimpor file. Pastikan format file, NO DO dan nama kios benar.',
-                variant: 'destructive',
-            });
-        } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-    reader.readAsArrayBuffer(file);
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Impor data tidak diizinkan dalam mode demo.' });
   };
 
   if (branchLoading) {
@@ -509,7 +388,7 @@ export default function PembayaranPage() {
                 accept=".xlsx, .xls, .csv"
                 onChange={handleImport}
             />
-            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled>
                 <Upload className="mr-2 h-4 w-4" />
                 Impor
             </Button>
@@ -582,10 +461,10 @@ export default function PembayaranPage() {
                   <TableCell className="text-right px-2">{formatCurrency(payment.amount)}</TableCell>
                   <TableCell className="px-2">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-6 w-6 p-0" disabled><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDialogOpen(payment)}><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(payment.id)}><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>
+                        <DropdownMenuItem disabled><Edit className="mr-2 h-4 w-4" />Ubah</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" disabled><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -617,6 +496,7 @@ export default function PembayaranPage() {
                               'w-full pl-3 text-left font-normal',
                               !field.value && 'text-muted-foreground'
                             )}
+                            disabled
                           >
                             {field.value ? (
                               format(field.value, 'dd/MM/yyyy')
@@ -632,9 +512,7 @@ export default function PembayaranPage() {
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date('1900-01-01')
-                          }
+                          disabled
                           initialFocus
                         />
                       </PopoverContent>
@@ -660,7 +538,7 @@ export default function PembayaranPage() {
                             placeholder="Pilih transaksi"
                             searchPlaceholder="Cari transaksi..."
                             emptyPlaceholder="Transaksi tidak ditemukan."
-                            disabled={!!editingPayment}
+                            disabled={!!editingPayment || true}
                         />
                         <FormMessage />
                     </FormItem>
@@ -682,17 +560,17 @@ export default function PembayaranPage() {
                 <FormItem>
                   <div className="flex justify-between items-center">
                     <FormLabel>Total Bayar</FormLabel>
-                    <Button type="button" size="sm" variant="secondary" onClick={handleLunas}>
+                    <Button type="button" size="sm" variant="secondary" onClick={handleLunas} disabled>
                       LUNAS
                     </Button>
                   </div>
-                  <FormControl><Input type="number" {...field} /></FormControl>
+                  <FormControl><Input type="number" {...field} disabled /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Batal</Button></DialogClose>
-                <Button type="submit">{editingPayment ? 'Simpan' : 'Tambah'}</Button>
+                <Button type="submit" disabled>{editingPayment ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>
             </form>
           </Form>

@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { Branch } from '@/lib/types';
-import { getBranches, addBranch } from '@/services/branchService';
+import { getBranches } from '@/lib/data-service';
 import { useAuth } from './use-auth';
 
 const ALL_BRANCHES_ID = 'all';
@@ -15,7 +15,6 @@ interface BranchContextType {
   allBranchesOption: { id: string, name: string };
   setActiveBranch: (branch: Branch | { id: string, name: string } | null) => void;
   loading: boolean;
-  addBranch: (name: string) => Promise<void>;
   getBranchName: (branchId: string) => string;
 }
 
@@ -70,11 +69,6 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
   
-  const handleAddBranch = async (name: string) => {
-      const newBranch = await addBranch({ name });
-      setBranches(prev => [...prev, newBranch]);
-  };
-
   const getBranchName = useCallback((branchId: string) => {
     if (branchId === ALL_BRANCHES_ID) return ALL_BRANCHES_NAME;
     return branches.find(b => b.id === branchId)?.name || 'N/A';
@@ -85,7 +79,6 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       activeBranch, 
       setActiveBranch, 
       loading,
-      addBranch: handleAddBranch,
       allBranchesOption,
       getBranchName,
     }), [branches, activeBranch, loading, getBranchName]);

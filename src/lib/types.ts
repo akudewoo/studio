@@ -3,6 +3,7 @@
 export interface AppUser {
   uid: string;
   username: string;
+  password?: string; // Made optional as we don't store it after login
   role: 'owner' | 'admin';
   branchId?: string;
   branchName?: string;
@@ -114,7 +115,7 @@ export interface KasAngkutan {
 
 // Omit 'id' and 'created_at' when creating a new entity
 export type BranchInput = Omit<Branch, 'id'>;
-export type ProductInput = Omit<Product, 'created_at'>;
+export type ProductInput = Omit<Product, 'id' | 'created_at'>;
 export type KioskInput = Omit<Kiosk, 'id' | 'created_at'>;
 export type RedemptionInput = Omit<Redemption, 'id' | 'created_at'>;
 export type DOReleaseInput = Omit<DORelease, 'id' | 'created_at'>;

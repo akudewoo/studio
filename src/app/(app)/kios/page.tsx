@@ -32,11 +32,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Kiosk, KioskDistribution, Payment, Product, Redemption, KioskInput } from '@/lib/types';
-import { getKiosks, addKiosk, updateKiosk, deleteKiosk, deleteMultipleKiosks, addMultipleKiosks } from '@/services/kioskService';
-import { getKioskDistributions } from '@/services/kioskDistributionService';
-import { getPayments } from '@/services/paymentService';
-import { getProducts } from '@/services/productService';
-import { getRedemptions } from '@/services/redemptionService';
+import { getKiosks, getKioskDistributions, getPayments, getProducts, getRedemptions } from '@/lib/data-service';
 import { cn } from '@/lib/utils';
 import { exportToPdf } from '@/lib/pdf-export';
 import { useBranch } from '@/hooks/use-branch';
@@ -87,7 +83,7 @@ export default function KiosPage() {
         console.error("Data loading error: ", error);
         toast({
           title: 'Gagal Memuat Data',
-          description: 'Gagal memuat data dari database.',
+          description: 'Gagal memuat data dari file lokal.',
           variant: 'destructive',
         });
       }
@@ -224,75 +220,14 @@ export default function KiosPage() {
     }
     setIsDialogOpen(true);
   };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteKiosk(id);
-      setKiosks(kiosks.filter((k) => k.id !== id));
-      toast({
-        title: 'Sukses',
-        description: 'Data kios berhasil dihapus.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menghapus data kios.',
-        variant: 'destructive',
-      });
-    }
-  };
   
   const handleDeleteSelected = async () => {
-    try {
-      await deleteMultipleKiosks(selectedKiosks);
-      setKiosks(kiosks.filter(k => !selectedKiosks.includes(k.id)));
-      setSelectedKiosks([]);
-      toast({
-        title: 'Sukses',
-        description: `${selectedKiosks.length} kios berhasil dihapus.`,
-      });
-    } catch (error) {
-       toast({
-        title: 'Error',
-        description: 'Gagal menghapus kios terpilih.',
-        variant: 'destructive',
-      });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menghapus data tidak diizinkan dalam mode demo.' });
   };
 
 
   const onSubmit = async (values: z.infer<typeof kioskSchema>) => {
-    if (!activeBranch || activeBranch.id === 'all') {
-        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk menambah/mengubah data.', variant: 'destructive' });
-        return;
-    }
-    try {
-      if (editingKiosk) {
-        await updateKiosk(editingKiosk.id, values);
-        setKiosks(
-          kiosks.map((k) => (k.id === editingKiosk.id ? { ...k, ...values } : k))
-        );
-        toast({
-          title: 'Sukses',
-          description: 'Data kios berhasil diperbarui.',
-        });
-      } else {
-        const newKiosk = await addKiosk({ ...values, branchId: activeBranch.id });
-        setKiosks([...kiosks, newKiosk]);
-        toast({
-          title: 'Sukses',
-          description: 'Kios baru berhasil ditambahkan.',
-        });
-      }
-      setIsDialogOpen(false);
-      setEditingKiosk(null);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Gagal menyimpan data kios.',
-        variant: 'destructive',
-      });
-    }
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Menyimpan data tidak diizinkan dalam mode demo.' });
   };
   
   const handleSelectAll = (checked: boolean) => {
@@ -357,68 +292,7 @@ export default function KiosPage() {
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !activeBranch || activeBranch.id === 'all') {
-        toast({ title: 'Aksi Tidak Diizinkan', description: 'Silakan pilih cabang spesifik untuk mengimpor data.', variant: 'destructive' });
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = e.target?.result;
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-            const newKiosks: KioskInput[] = [];
-            for (const item of json) {
-                const kioskData = {
-                    name: item['Nama Kios'],
-                    address: item['Alamat'],
-                    phone: String(item['No. Telepon']),
-                    desa: item['Desa'],
-                    kecamatan: item['Kecamatan'],
-                    penanggungJawab: item['Penanggung Jawab'],
-                    branchId: activeBranch.id
-                };
-                
-                const parsed = kioskSchema.strip().safeParse(kioskData);
-                if (parsed.success) {
-                    newKiosks.push({ ...parsed.data, branchId: activeBranch.id });
-                } else {
-                    console.warn('Invalid item skipped:', item, parsed.error);
-                }
-            }
-
-            if (newKiosks.length > 0) {
-                const addedKiosks = await addMultipleKiosks(newKiosks);
-                setKiosks(prev => [...prev, ...addedKiosks]);
-                toast({
-                    title: 'Sukses',
-                    description: `${addedKiosks.length} kios berhasil diimpor.`,
-                });
-            } else {
-                 toast({
-                    title: 'Tidak Ada Data',
-                    description: 'Tidak ada data kios yang valid untuk diimpor.',
-                    variant: 'destructive',
-                });
-            }
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: 'Gagal mengimpor file. Pastikan format file benar.',
-                variant: 'destructive',
-            });
-        } finally {
-            if(fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-    reader.readAsArrayBuffer(file);
+    toast({ title: 'Fitur Dinonaktifkan', description: 'Impor data tidak diizinkan dalam mode demo.' });
   };
 
   if (branchLoading) {
@@ -468,7 +342,7 @@ export default function KiosPage() {
             accept=".xlsx, .xls, .csv"
             onChange={handleImport}
           />
-          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled>
               <Upload className="mr-2 h-4 w-4" />
               Impor
           </Button>
@@ -569,19 +443,19 @@ export default function KiosPage() {
                   <TableCell className="px-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-6 w-6 p-0">
+                        <Button variant="ghost" className="h-6 w-6 p-0" disabled>
                           <span className="sr-only">Buka menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDialogOpen(kiosk)}>
+                        <DropdownMenuItem disabled>
                           <Edit className="mr-2 h-4 w-4" />
                           Ubah
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => handleDelete(kiosk.id)}
+                          disabled
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Hapus
@@ -618,7 +492,7 @@ export default function KiosPage() {
                   <FormItem className="col-span-2">
                     <FormLabel>Nama Kios</FormLabel>
                     <FormControl>
-                      <Input placeholder="cth. Kios Tani Makmur" {...field} />
+                      <Input placeholder="cth. Kios Tani Makmur" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -631,7 +505,7 @@ export default function KiosPage() {
                   <FormItem className="col-span-2">
                     <FormLabel>Penanggung Jawab</FormLabel>
                     <FormControl>
-                      <Input placeholder="cth. Budi" {...field} />
+                      <Input placeholder="cth. Budi" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -644,7 +518,7 @@ export default function KiosPage() {
                   <FormItem className="col-span-2">
                     <FormLabel>Alamat</FormLabel>
                     <FormControl>
-                      <Input placeholder="cth. Jl. Raya No. 123" {...field} />
+                      <Input placeholder="cth. Jl. Raya No. 123" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -657,7 +531,7 @@ export default function KiosPage() {
                   <FormItem>
                     <FormLabel>Desa</FormLabel>
                     <FormControl>
-                      <Input placeholder="cth. Sukamaju" {...field} />
+                      <Input placeholder="cth. Sukamaju" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -670,7 +544,7 @@ export default function KiosPage() {
                   <FormItem>
                     <FormLabel>Kecamatan</FormLabel>
                     <FormControl>
-                      <Input placeholder="cth. Ciranjang" {...field} />
+                      <Input placeholder="cth. Ciranjang" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -683,7 +557,7 @@ export default function KiosPage() {
                   <FormItem className="col-span-2">
                     <FormLabel>No. Telepon</FormLabel>
                     <FormControl>
-                      <Input placeholder="cth. 08123456789" {...field} />
+                      <Input placeholder="cth. 08123456789" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -695,7 +569,7 @@ export default function KiosPage() {
                     Batal
                   </Button>
                 </DialogClose>
-                <Button type="submit">{editingKiosk ? 'Simpan' : 'Tambah'}</Button>
+                <Button type="submit" disabled>{editingKiosk ? 'Simpan' : 'Tambah'}</Button>
               </DialogFooter>
             </form>
           </Form>
