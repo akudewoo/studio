@@ -1,8 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-// Remove getAuth since we are not using Firebase Auth anymore
-// import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 // This will now read directly from Vercel's Environment Variables
@@ -16,8 +14,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let app;
+if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+} else {
+    app = getApp();
+}
+
 const db = getFirestore(app);
-// const auth = getAuth(app); // No longer needed
 
 export { db };
