@@ -1,12 +1,14 @@
+
 import { supabase } from '@/lib/supabase';
 import type { Product, ProductInput } from '@/lib/types';
 
 const TABLE_NAME = 'products';
 
 export async function addProduct(product: ProductInput): Promise<Product> {
+    const newProduct = { ...product, id: crypto.randomUUID() };
     const { data, error } = await supabase
         .from(TABLE_NAME)
-        .insert(product)
+        .insert(newProduct)
         .select()
         .single();
     if (error) throw error;
@@ -14,9 +16,10 @@ export async function addProduct(product: ProductInput): Promise<Product> {
 }
 
 export async function addMultipleProducts(products: ProductInput[]): Promise<Product[]> {
+    const newProductsWithIds = products.map(p => ({...p, id: crypto.randomUUID()}));
     const { data, error } = await supabase
         .from(TABLE_NAME)
-        .insert(products)
+        .insert(newProductsWithIds)
         .select();
     if (error) throw error;
     return data;
