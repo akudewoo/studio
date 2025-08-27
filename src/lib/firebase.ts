@@ -5,6 +5,7 @@ import { getFirestore } from "firebase/firestore";
 // import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
+// This will now read directly from Vercel's Environment Variables
 const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
