@@ -2,19 +2,15 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// Your web app's Firebase configuration
-// For information on how to get this, visit:
-// https://firebase.google.com/docs/web/setup#available-libraries
-
+// Your web app's Firebase configuration, directly embedded
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyC5Nz9l6wcUs5c-HqsrhR6kXJmar-dX0j4",
+  authDomain: "alur-distribusi.firebaseapp.com",
+  projectId: "alur-distribusi",
+  storageBucket: "alur-distribusi.firebasestorage.app",
+  messagingSenderId: "844802255380",
+  appId: "1:844802255380:web:5485d5ed43717bd6c29501"
 };
-
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
