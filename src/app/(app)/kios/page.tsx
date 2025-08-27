@@ -76,7 +76,7 @@ export default function KiosPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!activeBranch) return;
+      if (!activeBranch || branchLoading) return;
       try {
         setKiosks(await getKiosks(activeBranch.id));
         setDistributions(await getKioskDistributions(activeBranch.id));
@@ -84,7 +84,7 @@ export default function KiosPage() {
         setProducts(await getProducts(activeBranch.id));
         setRedemptions(await getRedemptions(activeBranch.id));
       } catch (error) {
-        console.error("Firebase Error: ", error);
+        console.error("Data loading error: ", error);
         toast({
           title: 'Gagal Memuat Data',
           description: 'Gagal memuat data dari database.',
@@ -93,7 +93,7 @@ export default function KiosPage() {
       }
     }
     loadData();
-  }, [activeBranch, toast]);
+  }, [activeBranch, branchLoading, toast]);
   
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
@@ -704,5 +704,3 @@ export default function KiosPage() {
     </main>
   );
 }
-
-    

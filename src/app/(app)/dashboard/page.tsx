@@ -35,7 +35,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!activeBranch) return;
+      if (!activeBranch || branchLoading) return;
       try {
         setLoading(true);
         const [kiosks, products, redemptions, doReleases, distributions, payments] = await Promise.all([
@@ -54,7 +54,7 @@ export default function DashboardPage() {
       }
     }
     loadData();
-  }, [activeBranch]);
+  }, [activeBranch, branchLoading]);
 
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;

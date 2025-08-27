@@ -71,7 +71,7 @@ export default function PenebusanPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!activeBranch) return;
+      if (!activeBranch || branchLoading) return;
       try {
         setRedemptions(await getRedemptions(activeBranch.id));
         setProducts(await getProducts(activeBranch.id));
@@ -84,7 +84,7 @@ export default function PenebusanPage() {
       }
     }
     loadData();
-  }, [activeBranch, toast]);
+  }, [activeBranch, branchLoading, toast]);
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);

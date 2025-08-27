@@ -75,7 +75,7 @@ export default function PengeluaranDOPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!activeBranch) return;
+      if (!activeBranch || branchLoading) return;
       try {
         setDoReleases(await getDOReleases(activeBranch.id));
         setRedemptions(await getRedemptions(activeBranch.id));
@@ -89,7 +89,7 @@ export default function PengeluaranDOPage() {
       }
     }
     loadData();
-  }, [activeBranch, toast]);
+  }, [activeBranch, branchLoading, toast]);
 
   const redemptionMap = useMemo(() => {
     return redemptions.reduce((map, r) => {

@@ -66,22 +66,22 @@ export default function ProdukPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!activeBranch) return;
+      if (!activeBranch || branchLoading) return;
       try {
         setProducts(await getProducts(activeBranch.id));
         setRedemptions(await getRedemptions(activeBranch.id));
         setDoReleases(await getDOReleases(activeBranch.id));
       } catch (error) {
-        console.error("Firebase Error: ", error);
+        console.error("Data loading error: ", error);
         toast({
           title: 'Gagal Memuat Data',
-          description: 'Pastikan konfigurasi Firebase Anda sudah benar dan layanan Firestore telah diaktifkan.',
+          description: 'Gagal memuat data dari database.',
           variant: 'destructive',
         });
       }
     }
     loadData();
-  }, [activeBranch, toast]);
+  }, [activeBranch, branchLoading, toast]);
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
@@ -673,5 +673,3 @@ export default function ProdukPage() {
     </div>
   );
 }
-
-    

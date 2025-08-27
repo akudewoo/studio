@@ -112,7 +112,7 @@ export default function PembayaranPage() {
 
   useEffect(() => {
     async function loadData() {
-        if (!activeBranch) return;
+        if (!activeBranch || branchLoading) return;
       try {
         setPayments(await getPayments(activeBranch.id));
         setDistributions(await getKioskDistributions(activeBranch.id));
@@ -128,7 +128,7 @@ export default function PembayaranPage() {
       }
     }
     loadData();
-  }, [activeBranch, toast]);
+  }, [activeBranch, branchLoading, toast]);
   
   const formatCurrency = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 

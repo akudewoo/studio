@@ -83,7 +83,7 @@ export default function KasAngkutanPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!activeBranch) return;
+      if (!activeBranch || branchLoading) return;
       try {
         setKasList(await getKasAngkutan(activeBranch.id));
         setDistributions(await getKioskDistributions(activeBranch.id));
@@ -96,7 +96,7 @@ export default function KasAngkutanPage() {
       }
     }
     loadData();
-  }, [activeBranch, toast]);
+  }, [activeBranch, branchLoading, toast]);
   
   const formatCurrency = (value: number) => {
     const isNegative = value < 0;
