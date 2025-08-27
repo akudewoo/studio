@@ -83,7 +83,7 @@ export default function DashboardPage() {
   };
 
   const dashboardMetrics = useMemo(() => {
-    if (!data || loading) return {
+    if (!data || loading || !activeBranch) return {
       totalKiosks: 0,
       totalStock: 0,
       totalOutstanding: 0,
@@ -183,9 +183,9 @@ export default function DashboardPage() {
 
 
     return { totalKiosks, totalStock, totalOutstanding, totalAssetValue, stockByProduct, topOutstandingKiosks, monthlySales, topSellingProducts };
-  }, [data, loading]);
+  }, [data, loading, activeBranch]);
   
-  if (loading || !data) {
+  if (loading || !data || !activeBranch) {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
           <h1 className="font-headline text-lg font-semibold md:text-2xl">Dasbor</h1>

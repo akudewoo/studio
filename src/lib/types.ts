@@ -109,11 +109,12 @@ export interface KasAngkutan {
     helper: number;
     branchId: string;
     nominal?: number;
+    distributionId?: string;
 }
 
 // Omit 'id' and 'created_at' when creating a new entity
 export type BranchInput = Omit<Branch, 'id'>;
-export type ProductInput = Omit<Product, 'id' | 'created_at'>;
+export type ProductInput = Omit<Product, 'created_at'>;
 export type KioskInput = Omit<Kiosk, 'id' | 'created_at'>;
 export type RedemptionInput = Omit<Redemption, 'id' | 'created_at'>;
 export type DOReleaseInput = Omit<DORelease, 'id' | 'created_at'>;
