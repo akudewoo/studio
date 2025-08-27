@@ -8,7 +8,21 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL and Anon Key must be provided in .env');
+  console.error('Supabase URL and Anon Key are not defined. Please check your .env file.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Ensure createClient is not called with undefined values
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : {
+      from: () => {
+        console.error('Supabase client is not initialized.');
+        // Return a mock object that prevents further errors
+        return {
+          select: () => Promise.resolve({ data: [], error: { message: 'Supabase not initialized', details: '', hint: '', code: '' } }),
+          insert: () => Promise.resolve({ data: [], error: { message: 'Supabase not initialized', details: '', hint: '', code: '' } }),
+          update: () => Promise.resolve({ data: [], error: { message: 'Supabase not initialized', details: '', hint: '', code: '' } }),
+          delete: () => Promise.resolve({ data: [], error: { message: 'Supabase not initialized', details: '', hint: '', code: '' } }),
+        };
+      }
+    };
